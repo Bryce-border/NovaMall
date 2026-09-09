@@ -1,0 +1,10 @@
+.idea/
+*.iml
+target/
+.m2/
+.classpath
+.project
+.settings/
+logs/
+.env
+.mvn-local-settings.xml

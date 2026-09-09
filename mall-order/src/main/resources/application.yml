@@ -1,0 +1,43 @@
+server:
+  port: 8085
+spring:
+  application:
+    name: mall-order
+  datasource:
+    url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3307}/mall?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    username: ${MYSQL_USERNAME:root}
+    password: ${MYSQL_PASSWORD:root}
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:novamall}
+    password: ${RABBITMQ_PASSWORD:novamall}
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    template:
+      mandatory: true
+  cloud:
+    nacos:
+      discovery:
+        server-addr: ${NACOS_ADDR:localhost:8848}
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+logging:
+  pattern:
+    level: "%5p [traceId:%X{traceId}]"
+novamall:
+  payment:
+    mock-enabled: ${MOCK_PAYMENT_ENABLED:true}
+  fulfillment:
+    mock-enabled: ${MOCK_FULFILLMENT_ENABLED:true}
+  outbox:
+    publish-delay-ms: ${OUTBOX_PUBLISH_DELAY_MS:5000}
+  order:
+    timeout-scan-delay-ms: ${ORDER_TIMEOUT_SCAN_DELAY_MS:60000}
+    timeout-initial-delay-ms: ${ORDER_TIMEOUT_INITIAL_DELAY_MS:60000}

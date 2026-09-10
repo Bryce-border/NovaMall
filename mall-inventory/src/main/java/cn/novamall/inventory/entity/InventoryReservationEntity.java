@@ -13,6 +13,7 @@ public class InventoryReservationEntity {
     private Long id;
     private String orderNo;
     private Long productId;
+    private Long skuId;
     private Integer quantity;
     private String status;
     private LocalDateTime createdAt;
@@ -24,6 +25,8 @@ public class InventoryReservationEntity {
     public void setOrderNo(String orderNo) { this.orderNo = orderNo; }
     public Long getProductId() { return productId; }
     public void setProductId(Long productId) { this.productId = productId; }
+    public Long getSkuId() { return skuId; }
+    public void setSkuId(Long skuId) { this.skuId = skuId; }
     public Integer getQuantity() { return quantity; }
     public void setQuantity(Integer quantity) { this.quantity = quantity; }
     public String getStatus() { return status; }

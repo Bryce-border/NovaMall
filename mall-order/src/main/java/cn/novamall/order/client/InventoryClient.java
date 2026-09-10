@@ -15,8 +15,10 @@ public interface InventoryClient {
     @PostMapping("/release")
     void release(@RequestBody ReleaseRequest request);
 
-    record ReserveRequest(@NotNull @Positive Long productId, @NotNull @Positive Integer quantity,
-                          @NotNull String orderNo) { }
+    record ReserveRequest(@NotNull @Positive Long productId, Long skuId, @NotNull @Positive Integer quantity,
+                          @NotNull String orderNo) {
+        public ReserveRequest(Long productId, Integer quantity, String orderNo) { this(productId, null, quantity, orderNo); }
+    }
 
     record ReserveResponse(boolean success, String message) { }
 

@@ -9,6 +9,18 @@ import org.apache.ibatis.annotations.Update;
 @Mapper
 public interface InventoryMapper extends BaseMapper<InventoryEntity> {
 
+    @Update("UPDATE mall_inventory SET available_stock = available_stock + #{quantity}, locked_stock = locked_stock - #{quantity}, version = version + 1, updated_at = NOW() WHERE sku_id = #{skuId} AND locked_stock >= #{quantity}")
+    int releaseSku(@Param("skuId") Long skuId, @Param("quantity") Integer quantity);
+
+    @Update("UPDATE mall_inventory SET total_stock = total_stock - #{quantity}, locked_stock = locked_stock - #{quantity}, version = version + 1, updated_at = NOW() WHERE sku_id = #{skuId} AND locked_stock >= #{quantity} AND total_stock >= #{quantity}")
+    int confirmSku(@Param("skuId") Long skuId, @Param("quantity") Integer quantity);
+
+    @Update("UPDATE mall_inventory SET total_stock = total_stock + #{quantity}, available_stock = available_stock + #{quantity}, version = version + 1, updated_at = NOW() WHERE sku_id = #{skuId}")
+    int increaseSku(@Param("skuId") Long skuId, @Param("quantity") Integer quantity);
+
+    @Update("UPDATE mall_inventory SET available_stock = available_stock - #{quantity}, locked_stock = locked_stock + #{quantity}, version = version + 1, updated_at = NOW() WHERE sku_id = #{skuId} AND version = #{version} AND available_stock >= #{quantity}")
+    int reserveSku(@Param("skuId") Long skuId, @Param("quantity") Integer quantity, @Param("version") Integer version);
+
     @Update("""
             UPDATE mall_inventory
             SET available_stock = available_stock - #{quantity},
@@ -16,6 +28,7 @@ public interface InventoryMapper extends BaseMapper<InventoryEntity> {
                 version = version + 1,
                 updated_at = NOW()
             WHERE product_id = #{productId}
+              AND sku_id IS NULL
               AND version = #{version}
               AND available_stock >= #{quantity}
             """)
@@ -29,6 +42,7 @@ public interface InventoryMapper extends BaseMapper<InventoryEntity> {
                 version = version + 1,
                 updated_at = NOW()
             WHERE product_id = #{productId}
+              AND sku_id IS NULL
               AND locked_stock >= #{quantity}
             """)
     int release(@Param("productId") Long productId, @Param("quantity") Integer quantity);
@@ -39,6 +53,7 @@ public interface InventoryMapper extends BaseMapper<InventoryEntity> {
                 locked_stock = locked_stock - #{quantity},
                 version = version + 1, updated_at = NOW()
             WHERE product_id = #{productId}
+              AND sku_id IS NULL
               AND locked_stock >= #{quantity} AND total_stock >= #{quantity}
             """)
     int confirm(@Param("productId") Long productId, @Param("quantity") Integer quantity);
@@ -47,8 +62,10 @@ public interface InventoryMapper extends BaseMapper<InventoryEntity> {
             UPDATE mall_inventory
             SET total_stock = total_stock + #{quantity},
                 available_stock = available_stock + #{quantity},
+                version = version + 1,
                 updated_at = NOW()
             WHERE product_id = #{productId}
+              AND sku_id IS NULL
             """)
     int increase(@Param("productId") Long productId, @Param("quantity") Integer quantity);
 }

@@ -69,8 +69,10 @@ $product = Invoke-Json -Method Post -Path "/api/products" -Headers $headers -Bod
 }
 Assert-True $product.success "product creation failed"
 
+$skus = Invoke-Json -Method Get -Path "/api/products/$($product.data.id)/skus" -Headers $headers
 $stock = Invoke-Json -Method Post -Path "/api/inventory" -Headers $headers -Body @{
     productId = $product.data.id
+    skuId = $skus.data[0].skuId
     quantity = 10
 }
 Assert-True ($stock.data.availableStock -eq 10) "initial available stock should be 10"

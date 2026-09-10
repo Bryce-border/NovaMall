@@ -30,6 +30,8 @@
 
     <properties>
         <java.version>17</java.version>
+        <!-- Mockito's instrumentation must understand JDK 25 class files. -->
+        <byte-buddy.version>1.17.8</byte-buddy.version>
         <spring-cloud.version>2023.0.3</spring-cloud.version>
         <spring-cloud-alibaba.version>2023.0.3.2</spring-cloud-alibaba.version>
         <springdoc.version>2.6.0</springdoc.version>

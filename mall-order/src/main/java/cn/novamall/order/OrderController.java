@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -42,6 +43,16 @@ public class OrderController {
             @RequestHeader("X-User-Id") @Positive Long userId,
             @PathVariable String orderNo) {
         return ApiResponse.ok(orderService.get(userId, orderNo));
+    }
+
+    @GetMapping
+    public ApiResponse<OrderApiModels.OrderPageResponse> page(
+            @RequestHeader("X-User-Id") @Positive Long userId,
+            @RequestParam(name = "page", defaultValue = "1") long page,
+            @RequestParam(name = "size", defaultValue = "10") long size,
+            @RequestParam(required = false) String status) {
+        if (page < 1 || size < 1 || size > 100) throw new IllegalArgumentException("invalid page or size");
+        return ApiResponse.ok(orderService.page(userId, page, size, status));
     }
 
     @PostMapping("/{orderNo}/cancel")

@@ -12,7 +12,8 @@ $login=Invoke-Api Post "/api/auth/login" @{} @{username=$username;password=$pass
 $headers=@{Authorization="Bearer $($login.data.accessToken)"}
 $category=Invoke-Api Post "/api/categories" $headers @{parentId=0;name="Lifecycle Category $suffix";status=1;sortOrder=0}
 $product=Invoke-Api Post "/api/products" $headers @{categoryId=$category.data.id;name="Lifecycle Product $suffix";subtitle="Order lifecycle";price=18.00;status=1}
-Invoke-Api Post "/api/inventory" $headers @{productId=$product.data.id;quantity=3}|Out-Null
+$skus=Invoke-Api Get "/api/products/$($product.data.id)/skus" $headers
+Invoke-Api Post "/api/inventory" $headers @{productId=$product.data.id;skuId=$skus.data[0].skuId;quantity=3}|Out-Null
 $order=Invoke-Api Post "/api/orders" $headers @{items=@(@{productId=$product.data.id;quantity=1})}
 Assert-True ($order.data.status -eq "PENDING_PAYMENT") "order should start pending payment"
 $paid=Invoke-Api Post "/api/orders/$($order.data.orderNo)/pay" $headers

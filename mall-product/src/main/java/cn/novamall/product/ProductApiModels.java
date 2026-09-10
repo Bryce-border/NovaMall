@@ -40,6 +40,11 @@ public final class ProductApiModels {
 
     public record ProductPageResponse(List<ProductResponse> items, long total, long page, long size) { }
 
+    public record ProductDetailResponse(Long id, Long categoryId, String name, String subtitle,
+                                        String description, String coverImageUrl, BigDecimal price,
+                                        BigDecimal marketPrice, Integer status,
+                                        LocalDateTime createdAt, LocalDateTime updatedAt) { }
+
     public record HotProductResponse(Long productId, String name, BigDecimal price, Double score) { }
 
     public record SalesProductResponse(Long productId, String name, BigDecimal price, Double sales) { }

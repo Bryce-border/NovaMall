@@ -13,8 +13,10 @@ $headers=@{Authorization="Bearer $($login.data.accessToken)"}
 $category=Invoke-Api Post "/api/categories" $headers @{parentId=0;name="Sales Category $suffix";status=1;sortOrder=0}
 $first=Invoke-Api Post "/api/products" $headers @{categoryId=$category.data.id;name="Sales First $suffix";subtitle="Sales ranking first";price=10.00;status=1}
 $second=Invoke-Api Post "/api/products" $headers @{categoryId=$category.data.id;name="Sales Second $suffix";subtitle="Sales ranking second";price=20.00;status=1}
-Invoke-Api Post "/api/inventory" $headers @{productId=$first.data.id;quantity=3}|Out-Null
-Invoke-Api Post "/api/inventory" $headers @{productId=$second.data.id;quantity=2}|Out-Null
+$firstSkus=Invoke-Api Get "/api/products/$($first.data.id)/skus" $headers
+$secondSkus=Invoke-Api Get "/api/products/$($second.data.id)/skus" $headers
+Invoke-Api Post "/api/inventory" $headers @{productId=$first.data.id;skuId=$firstSkus.data[0].skuId;quantity=3}|Out-Null
+Invoke-Api Post "/api/inventory" $headers @{productId=$second.data.id;skuId=$secondSkus.data[0].skuId;quantity=2}|Out-Null
 
 function Complete-Order([long]$ProductId,[int]$Quantity) {
     $order=Invoke-Api Post "/api/orders" $headers @{items=@(@{productId=$ProductId;quantity=$Quantity})}

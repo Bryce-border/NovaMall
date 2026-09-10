@@ -31,12 +31,17 @@ public class InventoryController {
     @PostMapping
     public ApiResponse<InventoryApiModels.StockResponse> addStock(
             @Valid @RequestBody InventoryApiModels.AddStockRequest request) {
-        return ApiResponse.ok(inventoryService.addStock(request.productId(), request.quantity()));
+        return ApiResponse.ok(inventoryService.addStock(request.productId(), request.skuId(), request.quantity()));
     }
 
     @GetMapping("/{productId}")
     public ApiResponse<InventoryApiModels.StockResponse> get(
             @PathVariable @Positive Long productId) {
         return ApiResponse.ok(inventoryService.get(productId));
+    }
+
+    @GetMapping("/skus/{skuId}")
+    public ApiResponse<InventoryApiModels.StockResponse> getBySku(@PathVariable @Positive Long skuId) {
+        return ApiResponse.ok(inventoryService.getBySku(skuId));
     }
 }

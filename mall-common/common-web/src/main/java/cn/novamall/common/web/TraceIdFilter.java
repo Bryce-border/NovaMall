@@ -20,11 +20,13 @@ public class TraceIdFilter extends OncePerRequestFilter {
                                     FilterChain filterChain) throws ServletException, IOException {
         String traceId = TraceIdContext.resolve(request.getHeader(TraceIdContext.HEADER_NAME));
         response.setHeader(TraceIdContext.HEADER_NAME, traceId);
+        TraceIdContext.setCurrent(traceId);
         MDC.put(TraceIdContext.MDC_KEY, traceId);
         try {
             filterChain.doFilter(request, response);
         } finally {
             MDC.remove(TraceIdContext.MDC_KEY);
+            TraceIdContext.clearCurrent();
         }
     }
 }

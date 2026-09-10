@@ -57,6 +57,11 @@ public class ProductController {
         return ApiResponse.ok(productService.get(id));
     }
 
+    @GetMapping("/{id}/detail")
+    public ApiResponse<ProductApiModels.ProductDetailResponse> detail(@PathVariable @Positive Long id) {
+        return ApiResponse.ok(productService.detail(id));
+    }
+
     @GetMapping
     public ApiResponse<ProductApiModels.ProductPageResponse> page(
             @RequestParam(name = "page", defaultValue = "1") @Min(1) long page,

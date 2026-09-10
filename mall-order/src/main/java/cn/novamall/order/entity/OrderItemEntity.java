@@ -14,7 +14,11 @@ public class OrderItemEntity {
     private Long orderId;
     private String orderNo;
     private Long productId;
+    private Long skuId;
     private String productName;
+    private String coverImageUrl;
+    private String skuName;
+    private String specJson;
     private BigDecimal unitPrice;
     private Integer quantity;
     private BigDecimal amount;
@@ -27,8 +31,16 @@ public class OrderItemEntity {
     public void setOrderNo(String orderNo) { this.orderNo = orderNo; }
     public Long getProductId() { return productId; }
     public void setProductId(Long productId) { this.productId = productId; }
+    public Long getSkuId() { return skuId; }
+    public void setSkuId(Long value) { this.skuId = value; }
     public String getProductName() { return productName; }
     public void setProductName(String productName) { this.productName = productName; }
+    public String getCoverImageUrl() { return coverImageUrl; }
+    public void setCoverImageUrl(String value) { this.coverImageUrl = value; }
+    public String getSkuName() { return skuName; }
+    public void setSkuName(String value) { this.skuName = value; }
+    public String getSpecJson() { return specJson; }
+    public void setSpecJson(String value) { this.specJson = value; }
     public BigDecimal getUnitPrice() { return unitPrice; }
     public void setUnitPrice(BigDecimal unitPrice) { this.unitPrice = unitPrice; }
     public Integer getQuantity() { return quantity; }

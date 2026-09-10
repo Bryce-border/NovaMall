@@ -12,6 +12,7 @@ public class InventoryEntity {
     @TableId(type = IdType.ASSIGN_ID)
     private Long id;
     private Long productId;
+    private Long skuId;
     private Integer totalStock;
     private Integer availableStock;
     private Integer lockedStock;
@@ -23,6 +24,8 @@ public class InventoryEntity {
     public void setId(Long id) { this.id = id; }
     public Long getProductId() { return productId; }
     public void setProductId(Long productId) { this.productId = productId; }
+    public Long getSkuId() { return skuId; }
+    public void setSkuId(Long skuId) { this.skuId = skuId; }
     public Integer getTotalStock() { return totalStock; }
     public void setTotalStock(Integer totalStock) { this.totalStock = totalStock; }
     public Integer getAvailableStock() { return availableStock; }

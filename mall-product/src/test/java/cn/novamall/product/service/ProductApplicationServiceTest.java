@@ -55,8 +55,19 @@ class ProductApplicationServiceTest {
     @Mock
     private ProductRankingService rankingService;
 
+    @Mock
+    private cn.novamall.product.mapper.ProductSkuMapper skuMapper;
+
     @InjectMocks
     private ProductApplicationService service;
+
+    @BeforeEach
+    void initializeMybatisMetadata() {
+        com.baomidou.mybatisplus.core.metadata.TableInfoHelper.initTableInfo(
+                new org.apache.ibatis.builder.MapperBuilderAssistant(
+                        new com.baomidou.mybatisplus.core.MybatisConfiguration(), ""),
+                cn.novamall.product.entity.ProductSkuEntity.class);
+    }
 
     @Test
     void getReadsCacheAndRecordsProductView() throws Exception {

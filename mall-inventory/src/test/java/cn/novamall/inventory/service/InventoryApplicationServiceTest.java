@@ -40,7 +40,7 @@ class InventoryApplicationServiceTest {
     @Test
     void reserveRejectsInsufficientStockWithoutWritingReservation() {
         InventoryEntity inventory = inventory(8, 2, 0, 3);
-        when(inventoryMapper.selectOne(any())).thenReturn(inventory);
+        when(inventoryMapper.selectList(any())).thenReturn(List.of(inventory));
         when(reservationMapper.findByOrderAndProduct("ORDER-1", 100L)).thenReturn(null);
 
         InventoryApiModels.ReserveResponse response = service.reserve(
@@ -70,7 +70,7 @@ class InventoryApplicationServiceTest {
     void reserveUsesOptimisticLockAndCreatesReservationAfterSuccessfulUpdate() {
         InventoryEntity inventory = inventory(8, 8, 0, 3);
         when(reservationMapper.findByOrderAndProduct("ORDER-1", 100L)).thenReturn(null);
-        when(inventoryMapper.selectOne(any())).thenReturn(inventory);
+        when(inventoryMapper.selectList(any())).thenReturn(List.of(inventory));
         when(inventoryMapper.reserve(100L, 2, 3)).thenReturn(1);
 
         InventoryApiModels.ReserveResponse response = service.reserve(
@@ -126,6 +126,97 @@ class InventoryApplicationServiceTest {
         entity.setLockedStock(locked);
         entity.setVersion(version);
         return entity;
+    }
+
+    @Test
+    void skuReservationRecordsExactSkuAndUsesItsVersion() {
+        InventoryEntity row = inventory(8, 8, 0, 4);
+        row.setSkuId(101L);
+        when(inventoryMapper.selectOne(any())).thenReturn(row);
+        when(inventoryMapper.reserveSku(101L, 2, 4)).thenReturn(1);
+        assertTrue(service.reserve(new InventoryApiModels.ReserveRequest(100L, 101L, 2, "ORDER-1")).success());
+        ArgumentCaptor<InventoryReservationEntity> saved = ArgumentCaptor.forClass(InventoryReservationEntity.class);
+        verify(reservationMapper).insert(saved.capture());
+        assertEquals(101L, saved.getValue().getSkuId());
+        verify(inventoryMapper, never()).reserve(anyLong(), anyInt(), anyInt());
+    }
+
+    @Test
+    void rejectsSkuOfAnotherProductBeforeDeductingStock() {
+        InventoryEntity row = inventory(8, 8, 0, 4);
+        row.setSkuId(101L);
+        when(inventoryMapper.selectOne(any())).thenReturn(row);
+        assertThrows(IllegalArgumentException.class, () -> service.reserve(
+                new InventoryApiModels.ReserveRequest(200L, 101L, 2, "ORDER-1")));
+        verify(inventoryMapper, never()).reserveSku(anyLong(), anyInt(), anyInt());
+    }
+
+    @Test
+    void repeatedReservationCannotChangeQuantity() {
+        InventoryReservationEntity existing = reservation(1L, "LOCKED", 100L, 2);
+        existing.setSkuId(101L);
+        when(reservationMapper.findByOrderAndSku("ORDER-1", 101L)).thenReturn(existing);
+        assertFalse(service.reserve(new InventoryApiModels.ReserveRequest(100L, 101L, 3, "ORDER-1")).success());
+        verify(inventoryMapper, never()).reserveSku(anyLong(), anyInt(), anyInt());
+    }
+
+    @Test
+    void ambiguousProductStockRequiresSku() {
+        InventoryEntity first = inventory(8, 8, 0, 0);
+        first.setSkuId(101L);
+        InventoryEntity second = inventory(9, 9, 0, 0);
+        second.setSkuId(102L);
+        when(inventoryMapper.selectList(any())).thenReturn(List.of(first, second));
+        assertThrows(IllegalArgumentException.class, () -> service.get(100L));
+        assertThrows(IllegalArgumentException.class, () -> service.addStock(100L, 2));
+        verify(inventoryMapper, never()).increase(anyLong(), anyInt());
+    }
+
+    @Test
+    void skuRestockReloadsTheSameSku() {
+        InventoryEntity row = inventory(8, 8, 0, 0);
+        row.setSkuId(102L);
+        when(inventoryMapper.selectOne(any())).thenReturn(row);
+        when(inventoryMapper.increaseSku(102L, 2)).thenReturn(1);
+        assertEquals(102L, service.addStock(100L, 102L, 2).skuId());
+        verify(inventoryMapper, never()).selectList(any());
+        verify(inventoryMapper, never()).increase(anyLong(), anyInt());
+    }
+
+    @Test
+    void releasesTwoSkusOfSameProductIndependently() {
+        InventoryReservationEntity first = reservation(1L, "LOCKED", 100L, 2);
+        first.setSkuId(101L);
+        InventoryReservationEntity second = reservation(2L, "LOCKED", 100L, 3);
+        second.setSkuId(102L);
+        when(reservationMapper.findLockedByOrderNo("ORDER-1")).thenReturn(List.of(first, second));
+        when(reservationMapper.markReleased(1L)).thenReturn(1);
+        when(reservationMapper.markReleased(2L)).thenReturn(1);
+        when(inventoryMapper.releaseSku(101L, 2)).thenReturn(1);
+        when(inventoryMapper.releaseSku(102L, 3)).thenReturn(1);
+        service.release("ORDER-1");
+        verify(inventoryMapper).releaseSku(101L, 2);
+        verify(inventoryMapper).releaseSku(102L, 3);
+        verify(inventoryMapper, never()).release(anyLong(), anyInt());
+    }
+
+    @Test
+    void confirmsSkuAndDoesNotTouchOtherVariants() {
+        InventoryReservationEntity row = reservation(1L, "LOCKED", 100L, 2);
+        row.setSkuId(101L);
+        when(reservationMapper.findByOrderForUpdate("ORDER-1")).thenReturn(List.of(row));
+        when(reservationMapper.markConfirmed(1L)).thenReturn(1);
+        when(inventoryMapper.confirmSku(101L, 2)).thenReturn(1);
+        service.confirm("ORDER-1");
+        verify(inventoryMapper).confirmSku(101L, 2);
+        verify(inventoryMapper, never()).confirm(anyLong(), anyInt());
+    }
+
+    @Test
+    void invalidQuantityNeverReachesDatabase() {
+        assertThrows(IllegalArgumentException.class, () -> service.reserve(
+                new InventoryApiModels.ReserveRequest(100L, 101L, -1, "ORDER-1")));
+        verify(inventoryMapper, never()).selectOne(any());
     }
 
     private InventoryReservationEntity reservation(Long id, String status, Long productId, int quantity) {

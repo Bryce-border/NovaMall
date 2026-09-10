@@ -5,6 +5,9 @@ import cn.novamall.product.entity.CategoryEntity;
 import cn.novamall.product.entity.ProductEntity;
 import cn.novamall.product.mapper.CategoryMapper;
 import cn.novamall.product.mapper.ProductMapper;
+import cn.novamall.product.mapper.ProductSkuMapper;
+import cn.novamall.product.entity.ProductSkuEntity;
+import cn.novamall.common.id.IdGenerator;
 import cn.novamall.product.entity.ProductDocument;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -38,16 +41,19 @@ public class ProductApplicationService {
     private final ObjectMapper objectMapper;
     private final ProductSearchService searchService;
     private final ProductRankingService rankingService;
+    private final ProductSkuMapper skuMapper;
 
     public ProductApplicationService(ProductMapper productMapper, CategoryMapper categoryMapper,
                                      StringRedisTemplate redisTemplate, ObjectMapper objectMapper,
-                                     ProductSearchService searchService, ProductRankingService rankingService) {
+                                     ProductSearchService searchService, ProductRankingService rankingService,
+                                     ProductSkuMapper skuMapper) {
         this.productMapper = productMapper;
         this.categoryMapper = categoryMapper;
         this.redisTemplate = redisTemplate;
         this.objectMapper = objectMapper;
         this.searchService = searchService;
         this.rankingService = rankingService;
+        this.skuMapper = skuMapper;
     }
 
     @Transactional
@@ -65,6 +71,7 @@ public class ProductApplicationService {
         product.setCreatedAt(now);
         product.setUpdatedAt(now);
         productMapper.insert(product);
+        createDefaultSku(product, now);
         index(product);
         return toResponse(product);
     }
@@ -126,6 +133,14 @@ public class ProductApplicationService {
             throw new IllegalArgumentException("product is not available: " + id);
         }
         return product;
+    }
+
+    public ProductApiModels.ProductDetailResponse detail(Long id) {
+        ProductEntity product = productMapper.selectById(id);
+        if (product == null) throw new IllegalArgumentException("product not found: " + id);
+        return new ProductApiModels.ProductDetailResponse(product.getId(), product.getCategoryId(), product.getName(),
+                product.getSubtitle(), product.getDescription(), product.getCoverImageUrl(), product.getPrice(),
+                product.getMarketPrice(), product.getStatus(), product.getCreatedAt(), product.getUpdatedAt());
     }
 
     public ProductApiModels.ProductPageResponse page(long page, long size, Long categoryId,
@@ -191,6 +206,14 @@ public class ProductApplicationService {
         catch (RuntimeException ex) { log.warn("failed to index product, id={}", product.getId(), ex); }
     }
 
+    private void createDefaultSku(ProductEntity product, LocalDateTime now) {
+        ProductSkuEntity sku = new ProductSkuEntity();
+        sku.setId(IdGenerator.nextId()); sku.setProductId(product.getId());
+        sku.setSkuCode("P" + product.getId() + "-DEFAULT"); sku.setName("默认规格"); sku.setSpecJson("{}");
+        sku.setImageUrl(product.getCoverImageUrl()); sku.setPrice(product.getPrice()); sku.setMarketPrice(product.getMarketPrice());
+        sku.setStatus(product.getStatus()); sku.setCreatedAt(now); sku.setUpdatedAt(now); skuMapper.insert(sku);
+    }
+
     @Transactional
     public ProductApiModels.ProductResponse update(Long id, ProductApiModels.UpdateProductRequest request) {
         requireActiveCategory(request.categoryId());
@@ -203,6 +226,14 @@ public class ProductApplicationService {
         product.setStatus(request.status());
         product.setUpdatedAt(LocalDateTime.now());
         productMapper.updateById(product);
+        skuMapper.update(null, com.baomidou.mybatisplus.core.toolkit.Wrappers.<ProductSkuEntity>lambdaUpdate()
+                .eq(ProductSkuEntity::getProductId, id)
+                .eq(ProductSkuEntity::getSkuCode, "P" + id + "-DEFAULT")
+                .set(ProductSkuEntity::getPrice, product.getPrice())
+                .set(ProductSkuEntity::getMarketPrice, product.getMarketPrice())
+                .set(ProductSkuEntity::getImageUrl, product.getCoverImageUrl())
+                .set(ProductSkuEntity::getStatus, product.getStatus())
+                .set(ProductSkuEntity::getUpdatedAt, product.getUpdatedAt()));
         index(product);
         evict(id);
         return toResponse(product);

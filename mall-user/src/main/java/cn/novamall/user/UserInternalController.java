@@ -6,7 +6,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import cn.novamall.user.entity.UserAddressEntity;
+import cn.novamall.user.mapper.UserAddressMapper;
 import org.springframework.web.server.ResponseStatusException;
 
 @RestController
@@ -14,9 +18,18 @@ import org.springframework.web.server.ResponseStatusException;
 public class UserInternalController {
 
     private final UserApplicationService userService;
+    private final UserAddressMapper addressMapper;
 
-    public UserInternalController(UserApplicationService userService) {
+    public UserInternalController(UserApplicationService userService, UserAddressMapper addressMapper) {
         this.userService = userService;
+        this.addressMapper = addressMapper;
+    }
+
+    @GetMapping("/addresses/{id}")
+    public AddressSnapshot address(@PathVariable Long id, @RequestParam Long userId) {
+        UserAddressEntity a = addressMapper.selectById(id);
+        if (a == null || !userId.equals(a.getUserId())) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "address not found");
+        return new AddressSnapshot(a.getId(), a.getUserId(), a.getReceiverName(), a.getReceiverPhone(), a.getProvince(), a.getCity(), a.getDistrict(), a.getDetailAddress(), a.getPostalCode());
     }
 
     @GetMapping("/by-username")
@@ -29,4 +42,5 @@ public class UserInternalController {
     }
 
     public record UserProfile(Long id, String username, String passwordHash, String role, Integer status) { }
+    public record AddressSnapshot(Long id, Long userId, String receiverName, String receiverPhone, String province, String city, String district, String detailAddress, String postalCode) { }
 }

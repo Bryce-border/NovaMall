@@ -48,4 +48,6 @@ public final class ProductApiModels {
     public record HotProductResponse(Long productId, String name, BigDecimal price, Double score) { }
 
     public record SalesProductResponse(Long productId, String name, BigDecimal price, Double sales) { }
+
+    public record SalesCountResponse(String productId, Long soldQuantity) { }
 }

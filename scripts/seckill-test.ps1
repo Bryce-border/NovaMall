@@ -1,6 +1,12 @@
-param([string]$GatewayUrl = "http://localhost:8080")
+param(
+    [string]$GatewayUrl = "http://localhost:8080",
+    [string]$AdminUsername = "admin",
+    [string]$AdminPassword = "AdminPass123!"
+)
 
 $ErrorActionPreference = "Stop"
+. "$PSScriptRoot/demo-common.ps1"
+$adminHeaders = Get-DemoAdminHeaders -GatewayUrl $GatewayUrl -Username $AdminUsername -Password $AdminPassword
 
 function Invoke-Api {
     param([string]$Method, [string]$Path, [hashtable]$Headers = @{}, [object]$Body)
@@ -26,16 +32,16 @@ $login = Invoke-Api Post "/api/auth/login" @{} @{
 }
 $headers = @{ Authorization = "Bearer $($login.data.accessToken)" }
 
-$category = Invoke-Api Post "/api/categories" $headers @{
+$category = Invoke-Api Post "/api/categories" $adminHeaders @{
     parentId = 0; name = "Seckill Category $suffix"; status = 1; sortOrder = 0
 }
-$product = Invoke-Api Post "/api/products" $headers @{
+$product = Invoke-Api Post "/api/products" $adminHeaders @{
     categoryId = $category.data.id; name = "Seckill Product $suffix"
     subtitle = "Redis Lua test"; price = 19.99; status = 1
 }
-Invoke-Api Post "/api/inventory" $headers @{ productId = $product.data.id; quantity = 2 } | Out-Null
+Invoke-Api Post "/api/inventory" $adminHeaders @{ productId = $product.data.id; quantity = 2 } | Out-Null
 
-$prepared = Invoke-Api Post "/api/seckill/$($product.data.id)/prepare" $headers @{ stock = 1 }
+$prepared = Invoke-Api Post "/api/seckill/$($product.data.id)/prepare" $adminHeaders @{ stock = 1 }
 Assert-True ($prepared.data.stock -eq 1) "seckill stock was not prepared"
 
 $accepted = Invoke-Api Post "/api/seckill/$($product.data.id)" $headers

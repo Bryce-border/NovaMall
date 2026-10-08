@@ -50,4 +50,14 @@ public class ProductRankingService {
             return new ProductApiModels.SalesProductResponse(id, p.getName(), p.getPrice(), score);
         }).toList();
     }
+
+    public List<ProductApiModels.SalesCountResponse> salesCounts(List<Long> productIds) {
+        // Query the requested products directly; absence from a top-N ranking is not zero sales.
+        // Redis errors propagate so clients can display "unavailable" instead of an invented zero.
+        return productIds.stream().distinct().map(id -> {
+            Double score = redisTemplate.opsForZSet().score(SALES_KEY, String.valueOf(id));
+            return new ProductApiModels.SalesCountResponse(
+                    id.toString(), score == null ? 0L : score.longValue());
+        }).toList();
+    }
 }

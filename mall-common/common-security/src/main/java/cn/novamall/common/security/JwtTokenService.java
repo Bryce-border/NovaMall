@@ -51,6 +51,10 @@ public final class JwtTokenService {
         return userId == null ? null : userId.longValue();
     }
 
+    public String role(String token) {
+        return parse(token).getPayload().get("role", String.class);
+    }
+
     public boolean isValid(String token) {
         try {
             parse(token);

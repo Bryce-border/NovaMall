@@ -54,6 +54,8 @@ class OrderApplicationServiceTest {
     @Mock
     private OrderOutboxService orderOutboxService;
 
+    @Mock private OrderRecordService orderRecords;
+
     @Mock private UserClient userClient;
     @Mock private OrderAddressMapper orderAddressMapper;
     @Spy private ObjectMapper json = new ObjectMapper();

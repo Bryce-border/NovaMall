@@ -1,5 +1,11 @@
-param([string]$GatewayUrl = "http://localhost:8080")
+param(
+    [string]$GatewayUrl = "http://localhost:8080",
+    [string]$AdminUsername = "admin",
+    [string]$AdminPassword = "AdminPass123!"
+)
 $ErrorActionPreference = "Stop"
+. "$PSScriptRoot/demo-common.ps1"
+$adminHeaders = Get-DemoAdminHeaders -GatewayUrl $GatewayUrl -Username $AdminUsername -Password $AdminPassword
 function Invoke-Api { param([string]$Method,[string]$Path,[hashtable]$Headers=@{},[object]$Body)
     $p=@{Method=$Method;Uri="$GatewayUrl$Path";Headers=$Headers;ContentType="application/json"}
     if($null -ne $Body){$p.Body=$Body|ConvertTo-Json -Depth 8}
@@ -10,13 +16,13 @@ $suffix=Get-Date -Format "yyyyMMddHHmmssfff"; $username="sales$suffix"; $passwor
 $user=Invoke-Api Post "/api/users/register" @{} @{username=$username;password=$password;nickname="Sales Ranking Test"}
 $login=Invoke-Api Post "/api/auth/login" @{} @{username=$username;password=$password}
 $headers=@{Authorization="Bearer $($login.data.accessToken)"}
-$category=Invoke-Api Post "/api/categories" $headers @{parentId=0;name="Sales Category $suffix";status=1;sortOrder=0}
-$first=Invoke-Api Post "/api/products" $headers @{categoryId=$category.data.id;name="Sales First $suffix";subtitle="Sales ranking first";price=10.00;status=1}
-$second=Invoke-Api Post "/api/products" $headers @{categoryId=$category.data.id;name="Sales Second $suffix";subtitle="Sales ranking second";price=20.00;status=1}
+$category=Invoke-Api Post "/api/categories" $adminHeaders @{parentId=0;name="Sales Category $suffix";status=1;sortOrder=0}
+$first=Invoke-Api Post "/api/products" $adminHeaders @{categoryId=$category.data.id;name="Sales First $suffix";subtitle="Sales ranking first";price=10.00;status=1}
+$second=Invoke-Api Post "/api/products" $adminHeaders @{categoryId=$category.data.id;name="Sales Second $suffix";subtitle="Sales ranking second";price=20.00;status=1}
 $firstSkus=Invoke-Api Get "/api/products/$($first.data.id)/skus" $headers
 $secondSkus=Invoke-Api Get "/api/products/$($second.data.id)/skus" $headers
-Invoke-Api Post "/api/inventory" $headers @{productId=$first.data.id;skuId=$firstSkus.data[0].skuId;quantity=3}|Out-Null
-Invoke-Api Post "/api/inventory" $headers @{productId=$second.data.id;skuId=$secondSkus.data[0].skuId;quantity=2}|Out-Null
+Invoke-Api Post "/api/inventory" $adminHeaders @{productId=$first.data.id;skuId=$firstSkus.data[0].skuId;quantity=3}|Out-Null
+Invoke-Api Post "/api/inventory" $adminHeaders @{productId=$second.data.id;skuId=$secondSkus.data[0].skuId;quantity=2}|Out-Null
 
 function Complete-Order([long]$ProductId,[int]$Quantity) {
     $order=Invoke-Api Post "/api/orders" $headers @{items=@(@{productId=$ProductId;quantity=$Quantity})}

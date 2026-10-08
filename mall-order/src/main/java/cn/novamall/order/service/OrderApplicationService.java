@@ -46,11 +46,12 @@ public class OrderApplicationService {
     private final OrderAddressMapper orderAddressMapper;
     private final UserClient userClient;
     private final ObjectMapper json;
+    private final OrderRecordService orderRecords;
 
     public OrderApplicationService(OrderMapper orderMapper, OrderItemMapper orderItemMapper,
                                    ProductClient productClient, InventoryClient inventoryClient,
                                    OrderOutboxService orderOutboxService, OrderAddressMapper orderAddressMapper,
-                                   UserClient userClient, ObjectMapper json) {
+                                   UserClient userClient, ObjectMapper json, OrderRecordService orderRecords) {
         this.orderMapper = orderMapper;
         this.orderItemMapper = orderItemMapper;
         this.productClient = productClient;
@@ -59,6 +60,7 @@ public class OrderApplicationService {
         this.orderAddressMapper = orderAddressMapper;
         this.userClient = userClient;
         this.json = json;
+        this.orderRecords = orderRecords;
     }
 
     @Transactional
@@ -138,6 +140,7 @@ public class OrderApplicationService {
                 item.setOrderNo(orderNo);
                 orderItemMapper.insert(item);
             }
+            orderRecords.created(order);
             orderOutboxService.appendOrderEvent("ORDER_CREATED", order);
             return toResponse(order, orderItems);
         } catch (RuntimeException ex) {
@@ -180,7 +183,10 @@ public class OrderApplicationService {
         }
         if (PENDING_PAYMENT.equals(order.getStatus()) && orderMapper.markCancelledIfPending(orderNo) == 1) {
             order.setStatus("CANCELLED");
+            order.setCancelledAt(LocalDateTime.now());
+            order.setCancelReason("USER_CANCELLED");
             order.setUpdatedAt(LocalDateTime.now());
+            orderRecords.cancelled(order, false);
             orderOutboxService.appendOrderEvent("ORDER_CANCELLED", order);
         } else if (PENDING_PAYMENT.equals(order.getStatus())) {
             throw new IllegalStateException("order changed during cancellation: " + orderNo);
@@ -203,6 +209,7 @@ public class OrderApplicationService {
         order.setStatus(PAID);
         order.setPaidAt(LocalDateTime.now());
         order.setUpdatedAt(LocalDateTime.now());
+        orderRecords.paid(order);
         orderOutboxService.appendOrderEvent("ORDER_PAID", order);
         return loadOrderResponse(order);
     }
@@ -219,6 +226,7 @@ public class OrderApplicationService {
         order.setStatus(SHIPPED);
         order.setShippedAt(LocalDateTime.now());
         order.setUpdatedAt(LocalDateTime.now());
+        orderRecords.shipped(order);
         orderOutboxService.appendOrderEvent("ORDER_SHIPPED", order);
         return loadOrderResponse(order);
     }
@@ -235,6 +243,7 @@ public class OrderApplicationService {
         order.setStatus(COMPLETED);
         order.setCompletedAt(LocalDateTime.now());
         order.setUpdatedAt(LocalDateTime.now());
+        orderRecords.completed(order);
         List<OrderItemEntity> items = orderItemMapper.selectList(Wrappers.<OrderItemEntity>lambdaQuery()
                 .eq(OrderItemEntity::getOrderNo, orderNo));
         orderOutboxService.appendOrderEvent("ORDER_COMPLETED", order, items);
@@ -248,10 +257,12 @@ public class OrderApplicationService {
         if (order == null || !PENDING_PAYMENT.equals(order.getStatus())) {
             return;
         }
-        if (orderMapper.markCancelledIfPending(orderNo) == 1) {
+        if (orderMapper.markExpiredIfPending(orderNo, LocalDateTime.now().minusMinutes(30)) == 1) {
             order.setStatus("CANCELLED");
             order.setCancelledAt(LocalDateTime.now());
+            order.setCancelReason("PAYMENT_TIMEOUT");
             order.setUpdatedAt(LocalDateTime.now());
+            orderRecords.cancelled(order, true);
             orderOutboxService.appendOrderEvent("ORDER_CANCELLED", order);
         }
     }

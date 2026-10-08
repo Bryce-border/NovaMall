@@ -1,6 +1,12 @@
-param([string]$GatewayUrl = "http://localhost:8080")
+param(
+    [string]$GatewayUrl = "http://localhost:8080",
+    [string]$AdminUsername = "admin",
+    [string]$AdminPassword = "AdminPass123!"
+)
 
 $ErrorActionPreference = "Stop"
+. "$PSScriptRoot/demo-common.ps1"
+$adminHeaders = Get-DemoAdminHeaders -GatewayUrl $GatewayUrl -Username $AdminUsername -Password $AdminPassword
 
 function Invoke-Api {
     param([string]$Method, [string]$Path, [hashtable]$Headers = @{}, [object]$Body)
@@ -21,12 +27,12 @@ $password = "SmokePass123"
 Invoke-Api Post "/api/users/register" @{} @{ username = $username; password = $password; nickname = "Ranking Test" } | Out-Null
 $login = Invoke-Api Post "/api/auth/login" @{} @{ username = $username; password = $password }
 $headers = @{ Authorization = "Bearer $($login.data.accessToken)" }
-$category = Invoke-Api Post "/api/categories" $headers @{ parentId = 0; name = "Ranking Category $suffix"; status = 1; sortOrder = 0 }
+$category = Invoke-Api Post "/api/categories" $adminHeaders @{ parentId = 0; name = "Ranking Category $suffix"; status = 1; sortOrder = 0 }
 
-$first = Invoke-Api Post "/api/products" $headers @{
+$first = Invoke-Api Post "/api/products" $adminHeaders @{
     categoryId = $category.data.id; name = "Ranking First $suffix"; subtitle = "Hot ranking test"; price = 10.00; status = 1
 }
-$second = Invoke-Api Post "/api/products" $headers @{
+$second = Invoke-Api Post "/api/products" $adminHeaders @{
     categoryId = $category.data.id; name = "Ranking Second $suffix"; subtitle = "Hot ranking test"; price = 20.00; status = 1
 }
 

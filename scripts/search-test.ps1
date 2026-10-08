@@ -1,6 +1,12 @@
-param([string]$GatewayUrl = "http://localhost:8080")
+param(
+    [string]$GatewayUrl = "http://localhost:8080",
+    [string]$AdminUsername = "admin",
+    [string]$AdminPassword = "AdminPass123!"
+)
 
 $ErrorActionPreference = "Stop"
+. "$PSScriptRoot/demo-common.ps1"
+$adminHeaders = Get-DemoAdminHeaders -GatewayUrl $GatewayUrl -Username $AdminUsername -Password $AdminPassword
 
 function Invoke-Api {
     param([string]$Method, [string]$Path, [hashtable]$Headers = @{}, [object]$Body)
@@ -26,26 +32,26 @@ $login = Invoke-Api Post "/api/auth/login" @{} @{
 }
 $headers = @{ Authorization = "Bearer $($login.data.accessToken)" }
 
-$phoneCategory = Invoke-Api Post "/api/categories" $headers @{
+$phoneCategory = Invoke-Api Post "/api/categories" $adminHeaders @{
     parentId = 0; name = "Search Phones $suffix"; status = 1; sortOrder = 0
 }
-$tabletCategory = Invoke-Api Post "/api/categories" $headers @{
+$tabletCategory = Invoke-Api Post "/api/categories" $adminHeaders @{
     parentId = 0; name = "Search Tablets $suffix"; status = 1; sortOrder = 0
 }
 
-$alpha = Invoke-Api Post "/api/products" $headers @{
+$alpha = Invoke-Api Post "/api/products" $adminHeaders @{
     categoryId = $phoneCategory.data.id; name = "Search Phone Alpha $suffix"
     subtitle = "Phone search alpha"; price = 10.00; status = 1
 }
-$beta = Invoke-Api Post "/api/products" $headers @{
+$beta = Invoke-Api Post "/api/products" $adminHeaders @{
     categoryId = $phoneCategory.data.id; name = "Search Phone Beta $suffix"
     subtitle = "Phone search beta"; price = 20.00; status = 1
 }
-$tablet = Invoke-Api Post "/api/products" $headers @{
+$tablet = Invoke-Api Post "/api/products" $adminHeaders @{
     categoryId = $tabletCategory.data.id; name = "Search Tablet Gamma $suffix"
     subtitle = "Tablet search gamma"; price = 30.00; status = 1
 }
-$hidden = Invoke-Api Post "/api/products" $headers @{
+$hidden = Invoke-Api Post "/api/products" $adminHeaders @{
     categoryId = $phoneCategory.data.id; name = "Search Phone Hidden $suffix"
     subtitle = "Should not be searchable"; price = 15.00; status = 0
 }

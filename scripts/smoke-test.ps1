@@ -1,8 +1,12 @@
 param(
-    [string]$GatewayUrl = "http://localhost:8080"
+    [string]$GatewayUrl = "http://localhost:8080",
+    [string]$AdminUsername = "admin",
+    [string]$AdminPassword = "AdminPass123!"
 )
 
 $ErrorActionPreference = "Stop"
+. "$PSScriptRoot/demo-common.ps1"
+$adminHeaders = Get-DemoAdminHeaders -GatewayUrl $GatewayUrl -Username $AdminUsername -Password $AdminPassword
 
 function Assert-True {
     param([bool]$Condition, [string]$Message)
@@ -52,7 +56,7 @@ $login = Invoke-Json -Method Post -Path "/api/auth/login" -Body @{
 Assert-True $login.success "login failed"
 $headers = @{ Authorization = "Bearer $($login.data.accessToken)" }
 
-$category = Invoke-Json -Method Post -Path "/api/categories" -Headers $headers -Body @{
+$category = Invoke-Json -Method Post -Path "/api/categories" -Headers $adminHeaders -Body @{
     parentId = 0
     name = "Smoke Category $suffix"
     status = 1
@@ -60,7 +64,7 @@ $category = Invoke-Json -Method Post -Path "/api/categories" -Headers $headers -
 }
 Assert-True $category.success "category creation failed"
 
-$product = Invoke-Json -Method Post -Path "/api/products" -Headers $headers -Body @{
+$product = Invoke-Json -Method Post -Path "/api/products" -Headers $adminHeaders -Body @{
     categoryId = $category.data.id
     name = "Smoke Product $suffix"
     subtitle = "NovaMall integration check"
@@ -70,7 +74,7 @@ $product = Invoke-Json -Method Post -Path "/api/products" -Headers $headers -Bod
 Assert-True $product.success "product creation failed"
 
 $skus = Invoke-Json -Method Get -Path "/api/products/$($product.data.id)/skus" -Headers $headers
-$stock = Invoke-Json -Method Post -Path "/api/inventory" -Headers $headers -Body @{
+$stock = Invoke-Json -Method Post -Path "/api/inventory" -Headers $adminHeaders -Body @{
     productId = $product.data.id
     skuId = $skus.data[0].skuId
     quantity = 10

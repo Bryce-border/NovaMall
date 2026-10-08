@@ -29,9 +29,15 @@ public interface OrderMapper extends BaseMapper<OrderEntity> {
             + "AND created_at < #{cutoff} ORDER BY created_at LIMIT #{limit}")
     List<OrderEntity> findPendingBefore(@Param("cutoff") LocalDateTime cutoff, @Param("limit") int limit);
 
-    @Update("UPDATE mall_order SET status = 'CANCELLED', cancelled_at = NOW(), updated_at = NOW() "
+    @Update("UPDATE mall_order SET status = 'CANCELLED', cancel_reason = 'USER_CANCELLED', "
+            + "cancelled_at = NOW(), updated_at = NOW() "
             + "WHERE order_no = #{orderNo} AND status = 'PENDING_PAYMENT'")
     int markCancelledIfPending(@Param("orderNo") String orderNo);
+
+    @Update("UPDATE mall_order SET status = 'CANCELLED', cancel_reason = 'PAYMENT_TIMEOUT', "
+            + "cancelled_at = NOW(), updated_at = NOW() "
+            + "WHERE order_no = #{orderNo} AND status = 'PENDING_PAYMENT' AND created_at <= #{cutoff}")
+    int markExpiredIfPending(@Param("orderNo") String orderNo, @Param("cutoff") LocalDateTime cutoff);
 
     @Update("UPDATE mall_order SET status = 'PAID', paid_at = NOW(), updated_at = NOW() "
             + "WHERE order_no = #{orderNo} AND status = 'PENDING_PAYMENT'")

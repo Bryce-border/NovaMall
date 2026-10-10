@@ -9,5 +9,7 @@ public final class CartOrderApiModels {
 
     public record CheckoutRequest(
             @NotNull @Pattern(regexp = "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}") String requestKey,
-            @NotNull @Positive Long addressId) { }
+            @NotNull @Positive Long addressId, @Positive Long couponId) {
+        public CheckoutRequest(String requestKey, Long addressId) { this(requestKey, addressId, null); }
+    }
 }

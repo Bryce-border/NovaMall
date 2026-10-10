@@ -5,6 +5,7 @@ import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.Pattern;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -19,14 +20,18 @@ public final class ProductApiModels {
             @NotBlank @Size(max = 128) String name,
             @Size(max = 255) String subtitle,
             @NotNull @DecimalMin(value = "0.00") @Digits(integer = 10, fraction = 2) BigDecimal price,
-            @NotNull Integer status) { }
+            @NotNull Integer status,
+            @Size(max = 512) @Pattern(regexp = "^(?:https://[^\\s]+|/shop/[^\\s]*)?$") String coverImageUrl,
+            @Size(max = 10000) String description) { }
 
     public record UpdateProductRequest(
             @NotNull Long categoryId,
             @NotBlank @Size(max = 128) String name,
             @Size(max = 255) String subtitle,
             @NotNull @DecimalMin(value = "0.00") @Digits(integer = 10, fraction = 2) BigDecimal price,
-            @NotNull Integer status) { }
+            @NotNull Integer status,
+            @Size(max = 512) @Pattern(regexp = "^(?:https://[^\\s]+|/shop/[^\\s]*)?$") String coverImageUrl,
+            @Size(max = 10000) String description) { }
 
     public record ProductResponse(
             Long id,
@@ -36,7 +41,8 @@ public final class ProductApiModels {
             BigDecimal price,
             Integer status,
             LocalDateTime createdAt,
-            LocalDateTime updatedAt) { }
+            LocalDateTime updatedAt,
+            String coverImageUrl) { }
 
     public record ProductPageResponse(List<ProductResponse> items, long total, long page, long size) { }
 

@@ -74,6 +74,7 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
 
     private boolean isCatalogRead(String path) {
         return path.equals("/api/products") || path.equals("/api/categories")
+                || path.equals("/api/coupons/campaigns") || path.matches("/api/reviews/[0-9]+")
                 || path.equals("/api/products/sales-counts") || path.equals("/api/inventory/summary")
                 || path.matches("/api/products/[0-9]+/(detail|skus)")
                 || path.matches("/api/inventory/skus/[0-9]+");
@@ -81,6 +82,7 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
 
     private boolean requiresAdmin(HttpMethod method, String path) {
         if (method == null) return false;
+        if (path.equals("/api/coupons/admin") || path.startsWith("/api/coupons/admin/")) return true;
         if (path.equals("/api/products") && method == HttpMethod.POST) return true;
         if (path.startsWith("/api/products/")
                 && (method == HttpMethod.PUT || method == HttpMethod.DELETE)) return true;

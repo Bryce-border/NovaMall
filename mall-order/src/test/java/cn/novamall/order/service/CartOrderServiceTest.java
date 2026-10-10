@@ -25,6 +25,7 @@ class CartOrderServiceTest {
     @Mock UserClient users;
     @Mock OrderApplicationService orders;
     @Spy ObjectMapper json = new ObjectMapper();
+    @Mock private CouponService coupons;
     @InjectMocks CartOrderService service;
 
     @Test

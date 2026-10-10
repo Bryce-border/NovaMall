@@ -22,14 +22,16 @@ public class CartOrderService {
     private final UserClient users;
     private final OrderApplicationService orders;
     private final ObjectMapper json;
+    private final CouponService coupons;
 
     public CartOrderService(CartCheckoutMapper checkouts, CartCleanupMapper cleanup, UserClient users,
-                            OrderApplicationService orders, ObjectMapper json) {
+                            OrderApplicationService orders, ObjectMapper json, CouponService coupons) {
         this.checkouts = checkouts;
         this.cleanup = cleanup;
         this.users = users;
         this.orders = orders;
         this.json = json;
+        this.coupons = coupons;
     }
 
     @Transactional
@@ -47,6 +49,7 @@ public class CartOrderService {
         if (!request.addressId().equals(checkout.addressId())) {
             throw new IllegalArgumentException("requestKey already used with another address");
         }
+        coupons.bindCheckout(userId, key, request.couponId());
         if (checkout.orderNo() != null) return orders.get(userId, checkout.orderNo());
 
         List<UserClient.CartItemSnapshot> items = users.selectedCart(userId);
@@ -54,7 +57,7 @@ public class CartOrderService {
         List<OrderApiModels.OrderItemRequest> orderItems = items.stream()
                 .map(item -> new OrderApiModels.OrderItemRequest(null, item.skuId(), item.quantity())).toList();
         OrderApiModels.OrderResponse order = orders.create(userId, userName,
-                new OrderApiModels.CreateOrderRequest(orderItems, request.addressId()));
+                new OrderApiModels.CreateOrderRequest(orderItems, request.addressId(), request.couponId()));
         List<UserClient.CartCleanupItem> purchased = items.stream()
                 .map(item -> new UserClient.CartCleanupItem(item.cartItemId(), item.version())).toList();
         try {

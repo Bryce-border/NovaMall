@@ -17,8 +17,10 @@ public final class OrderApiModels {
     private OrderApiModels() { }
 
     public record CreateOrderRequest(
-            @NotEmpty @Size(max = 100) List<@NotNull @Valid OrderItemRequest> items, @Positive Long addressId) {
-        public CreateOrderRequest(List<@Valid OrderItemRequest> items) { this(items, null); }
+            @NotEmpty @Size(max = 100) List<@NotNull @Valid OrderItemRequest> items, @Positive Long addressId,
+            @Positive Long couponId) {
+        public CreateOrderRequest(List<@Valid OrderItemRequest> items) { this(items, null, null); }
+        public CreateOrderRequest(List<@Valid OrderItemRequest> items, Long addressId) { this(items, addressId, null); }
     }
 
     public record OrderItemRequest(@Positive Long productId, @Positive Long skuId,

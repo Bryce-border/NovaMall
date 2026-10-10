@@ -125,21 +125,67 @@ class ProductApplicationServiceTest {
         category.setId(10L);
         category.setStatus(1);
         ProductEntity product = product(100L, "Old phone", "299.00", 1);
+        product.setCoverImageUrl("https://example.com/original.webp");
+        product.setDescription("Existing description");
         when(categoryMapper.selectById(10L)).thenReturn(category);
         when(productMapper.selectById(100L)).thenReturn(product);
         when(productMapper.updateById(product)).thenReturn(1);
 
         ProductApiModels.ProductResponse result = service.update(100L,
-                new ProductApiModels.UpdateProductRequest(10L, "New phone", "Updated", new BigDecimal("399.00"), 1));
+                new ProductApiModels.UpdateProductRequest(10L, "New phone", "Updated", new BigDecimal("399.00"), 1, null, null));
 
         assertEquals("New phone", result.name());
         assertEquals(new BigDecimal("399.00"), result.price());
+        assertEquals("https://example.com/original.webp", result.coverImageUrl());
+        assertEquals("Existing description", product.getDescription());
         verify(productMapper).updateById(product);
         verify(redisTemplate).delete("product:detail:100");
         ArgumentCaptor<cn.novamall.product.entity.ProductDocument> documentCaptor =
                 ArgumentCaptor.forClass(cn.novamall.product.entity.ProductDocument.class);
         verify(searchService).index(documentCaptor.capture());
         assertEquals("New phone", documentCaptor.getValue().getName());
+    }
+
+    @Test
+    void createCopiesCoverToDefaultSkuAndCatalogResponse() {
+        CategoryEntity category = new CategoryEntity();
+        category.setId(10L);
+        category.setStatus(1);
+        when(categoryMapper.selectById(10L)).thenReturn(category);
+        org.mockito.Mockito.doAnswer(invocation -> {
+            ((ProductEntity) invocation.getArgument(0)).setId(100L);
+            return 1;
+        }).when(productMapper).insert(any(ProductEntity.class));
+
+        ProductApiModels.ProductResponse result = service.create(new ProductApiModels.CreateProductRequest(
+                10L, "Phone", "Demo", new BigDecimal("10000.00"), 1,
+                "https://example.com/phone.webp", "Product description"));
+
+        ArgumentCaptor<cn.novamall.product.entity.ProductSkuEntity> sku = ArgumentCaptor.forClass(
+                cn.novamall.product.entity.ProductSkuEntity.class);
+        verify(skuMapper).insert(sku.capture());
+        assertEquals(result.coverImageUrl(), sku.getValue().getImageUrl());
+        assertEquals("https://example.com/phone.webp", result.coverImageUrl());
+        assertEquals("P100-DEFAULT", sku.getValue().getSkuCode());
+    }
+
+    @Test
+    void updateCanExplicitlyClearCoverAndDescription() {
+        CategoryEntity category = new CategoryEntity();
+        category.setStatus(1);
+        when(categoryMapper.selectById(10L)).thenReturn(category);
+        ProductEntity product = product(100L, "Phone", "10000.00", 1);
+        product.setCoverImageUrl("https://example.com/old.webp");
+        product.setDescription("Old description");
+        when(productMapper.selectById(100L)).thenReturn(product);
+
+        ProductApiModels.ProductResponse result = service.update(100L, new ProductApiModels.UpdateProductRequest(
+                10L, "Phone", "Demo", product.getPrice(), 1, "", ""));
+
+        assertEquals("", result.coverImageUrl());
+        assertEquals("", product.getDescription());
+        verify(skuMapper).update(eq(null), any(com.baomidou.mybatisplus.core.conditions.Wrapper.class));
+        verify(redisTemplate).delete("product:detail:100");
     }
 
     @Test
@@ -150,7 +196,7 @@ class ProductApplicationServiceTest {
         when(categoryMapper.selectById(10L)).thenReturn(category);
 
         assertThrows(IllegalArgumentException.class, () -> service.create(
-                new ProductApiModels.CreateProductRequest(10L, "Phone", null, new BigDecimal("1.00"), 1)));
+                new ProductApiModels.CreateProductRequest(10L, "Phone", null, new BigDecimal("1.00"), 1, null, null)));
 
         verify(productMapper, never()).insert(any(ProductEntity.class));
         verify(searchService, never()).index(any());
@@ -172,6 +218,6 @@ class ProductApplicationServiceTest {
     private ProductApiModels.ProductResponse response(Long id, String name, String price, int status) {
         LocalDateTime now = LocalDateTime.now();
         return new ProductApiModels.ProductResponse(id, 10L, name, "subtitle",
-                new BigDecimal(price), status, now, now);
+                new BigDecimal(price), status, now, now, null);
     }
 }

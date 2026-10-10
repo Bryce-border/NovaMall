@@ -47,11 +47,12 @@ public class OrderApplicationService {
     private final UserClient userClient;
     private final ObjectMapper json;
     private final OrderRecordService orderRecords;
+    private final CouponService coupons;
 
     public OrderApplicationService(OrderMapper orderMapper, OrderItemMapper orderItemMapper,
                                    ProductClient productClient, InventoryClient inventoryClient,
                                    OrderOutboxService orderOutboxService, OrderAddressMapper orderAddressMapper,
-                                   UserClient userClient, ObjectMapper json, OrderRecordService orderRecords) {
+                                   UserClient userClient, ObjectMapper json, OrderRecordService orderRecords, CouponService coupons) {
         this.orderMapper = orderMapper;
         this.orderItemMapper = orderItemMapper;
         this.productClient = productClient;
@@ -61,6 +62,7 @@ public class OrderApplicationService {
         this.userClient = userClient;
         this.json = json;
         this.orderRecords = orderRecords;
+        this.coupons = coupons;
     }
 
     @Transactional
@@ -114,9 +116,11 @@ public class OrderApplicationService {
             order.setUserId(userId);
             order.setUserName(userName);
             order.setProductAmount(totalAmount);
-            order.setDiscountAmount(BigDecimal.ZERO);
+            BigDecimal discount = request.couponId() == null ? BigDecimal.ZERO
+                    : coupons.reserve(userId, request.couponId(), orderNo, totalAmount);
+            order.setDiscountAmount(discount);
             order.setFreightAmount(BigDecimal.ZERO);
-            order.setTotalAmount(totalAmount);
+            order.setTotalAmount(totalAmount.subtract(discount));
             order.setStatus(PENDING_PAYMENT);
             order.setCreatedAt(now);
             order.setUpdatedAt(now);
@@ -187,6 +191,7 @@ public class OrderApplicationService {
             order.setCancelReason("USER_CANCELLED");
             order.setUpdatedAt(LocalDateTime.now());
             orderRecords.cancelled(order, false);
+            coupons.release(orderNo);
             orderOutboxService.appendOrderEvent("ORDER_CANCELLED", order);
         } else if (PENDING_PAYMENT.equals(order.getStatus())) {
             throw new IllegalStateException("order changed during cancellation: " + orderNo);
@@ -210,6 +215,7 @@ public class OrderApplicationService {
         order.setPaidAt(LocalDateTime.now());
         order.setUpdatedAt(LocalDateTime.now());
         orderRecords.paid(order);
+        coupons.consume(orderNo);
         orderOutboxService.appendOrderEvent("ORDER_PAID", order);
         return loadOrderResponse(order);
     }
@@ -263,6 +269,7 @@ public class OrderApplicationService {
             order.setCancelReason("PAYMENT_TIMEOUT");
             order.setUpdatedAt(LocalDateTime.now());
             orderRecords.cancelled(order, true);
+            coupons.release(orderNo);
             orderOutboxService.appendOrderEvent("ORDER_CANCELLED", order);
         }
     }

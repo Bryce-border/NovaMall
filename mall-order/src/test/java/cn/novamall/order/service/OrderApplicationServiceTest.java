@@ -60,6 +60,7 @@ class OrderApplicationServiceTest {
     @Mock private OrderAddressMapper orderAddressMapper;
     @Spy private ObjectMapper json = new ObjectMapper();
 
+    @Mock private CouponService coupons;
     @InjectMocks
     private OrderApplicationService service;
 

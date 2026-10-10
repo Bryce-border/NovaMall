@@ -65,6 +65,8 @@ public class ProductApplicationService {
         product.setCategoryId(request.categoryId());
         product.setName(request.name());
         product.setSubtitle(request.subtitle());
+        product.setCoverImageUrl(request.coverImageUrl());
+        product.setDescription(request.description());
         product.setPrice(request.price());
         product.setStatus(request.status());
         product.setDeleted(0);
@@ -222,6 +224,9 @@ public class ProductApplicationService {
         product.setCategoryId(request.categoryId());
         product.setName(request.name());
         product.setSubtitle(request.subtitle());
+        // Older clients omit these optional fields; keep their existing content.
+        if (request.coverImageUrl() != null) product.setCoverImageUrl(request.coverImageUrl());
+        if (request.description() != null) product.setDescription(request.description());
         product.setPrice(request.price());
         product.setStatus(request.status());
         product.setUpdatedAt(LocalDateTime.now());
@@ -275,7 +280,7 @@ public class ProductApplicationService {
     private ProductApiModels.ProductResponse toResponse(ProductEntity product) {
         return new ProductApiModels.ProductResponse(product.getId(), product.getCategoryId(), product.getName(),
                 product.getSubtitle(), product.getPrice(), product.getStatus(), product.getCreatedAt(),
-                product.getUpdatedAt());
+                product.getUpdatedAt(), product.getCoverImageUrl());
     }
 
     private String cacheKey(Long id) {

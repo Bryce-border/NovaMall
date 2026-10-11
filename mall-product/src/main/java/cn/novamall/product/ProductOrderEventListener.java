@@ -22,7 +22,8 @@ public class ProductOrderEventListener {
                 || event.eventId() == null || event.items() == null) {
             throw new IllegalArgumentException("invalid order completed event");
         }
-        rankingService.recordCompletedOrder(event.eventId(), event.items());
+        // Drain legacy completion notifications. Migration 012 seeds their existing
+        // contribution; new orders use ORDER_SALES_UPDATED with durable versions.
     }
 
     public record OrderCompletedEvent(String eventId, String eventType, String orderNo,

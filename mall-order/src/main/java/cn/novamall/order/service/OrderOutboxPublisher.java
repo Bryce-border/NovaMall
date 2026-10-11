@@ -30,6 +30,10 @@ public class OrderOutboxPublisher {
     public OrderOutboxPublisher(OrderOutboxMapper outboxMapper, RabbitTemplate rabbitTemplate) {
         this.outboxMapper = outboxMapper;
         this.rabbitTemplate = rabbitTemplate;
+        // Shipment is an informational notification; its source shipment/history is
+        // already durable and currently has no subscriber. Business effects such as
+        // stock and sales still require a routed message and retry on NO_ROUTE.
+        this.rabbitTemplate.setMandatoryExpressionString("messageProperties.headers['nova-event-type'] != 'ORDER_SHIPPED'");
     }
 
     @Scheduled(fixedDelayString = "${novamall.outbox.publish-delay-ms:5000}")
@@ -44,7 +48,10 @@ public class OrderOutboxPublisher {
         try {
             CorrelationData correlation = new CorrelationData(message.getMessageId());
             rabbitTemplate.convertAndSend(OrderMessagingConfig.EVENTS_EXCHANGE,
-                    routingKey(message.getEventType()), message.getPayload(), correlation);
+                    routingKey(message.getEventType()), message.getPayload(), outgoing -> {
+                        outgoing.getMessageProperties().setHeader("nova-event-type", message.getEventType());
+                        return outgoing;
+                    }, correlation);
             CorrelationData.Confirm confirm = correlation.getFuture().get(5, TimeUnit.SECONDS);
             if (confirm == null || !confirm.isAck()) {
                 throw new IllegalStateException(confirm == null ? "publisher confirm missing" : confirm.getReason());
@@ -70,6 +77,8 @@ public class OrderOutboxPublisher {
             case ORDER_PAID -> "order.paid";
             case ORDER_SHIPPED -> "order.shipped";
             case ORDER_COMPLETED -> "order.completed";
+            case "REFUND_SUCCEEDED" -> "refund.succeeded";
+            case "ORDER_SALES_UPDATED" -> "order.sales-updated";
             default -> throw new IllegalArgumentException("unsupported order event: " + eventType);
         };
     }

@@ -51,7 +51,7 @@ spring:
         - id: mall-order
           uri: lb://mall-order
           predicates:
-            - Path=/api/orders/**,/api/coupons/**,/api/reviews/**
+            - Path=/api/orders/**,/api/coupons/**,/api/reviews/**,/api/refunds/**
           filters:
             - name: RequestRateLimiter
               args:

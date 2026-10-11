@@ -40,7 +40,7 @@ public final class OrderApiModels {
 
     public record OrderSummaryResponse(String orderNo, String status, int itemCount,
                                        OrderItemResponse firstItem, BigDecimal totalAmount,
-                                       LocalDateTime createdAt) { }
+                                       LocalDateTime createdAt, String refundStatus) { }
 
     public record OrderItemResponse(Long productId, Long skuId, String productName, String coverImageUrl,
                                     String skuName, BigDecimal unitPrice, Integer quantity, BigDecimal amount) {

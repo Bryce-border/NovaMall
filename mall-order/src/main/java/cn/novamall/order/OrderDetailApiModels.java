@@ -14,13 +14,17 @@ public final class OrderDetailApiModels {
                          List<Shipment> shipments, List<History> history, List<Action> actions,
                          LocalDateTime paymentDeadline, LocalDateTime createdAt, LocalDateTime updatedAt,
                          LocalDateTime paidAt, LocalDateTime shippedAt, LocalDateTime completedAt,
-                         LocalDateTime cancelledAt) { }
+                         LocalDateTime cancelledAt, RefundSummary refund) { }
+
+    public record RefundSummary(String refundedAmount, String pendingAmount, int pendingCount,
+                                long count, boolean fullyRefunded) { }
 
     public record Address(String receiverName, String receiverPhone, String province, String city,
                           String district, String detailAddress, String postalCode) { }
 
     public record Item(String productId, String skuId, String productName, String coverImageUrl,
-                       String skuName, JsonNode specs, String unitPrice, int quantity, String amount) { }
+                       String skuName, JsonNode specs, String unitPrice, int quantity, String amount,
+                       int refundedQuantity, int fulfillmentQuantity) { }
 
     public record Payment(String paymentNo, String channel, boolean simulated, String amount,
                           String status, LocalDateTime paidAt, LocalDateTime createdAt) { }

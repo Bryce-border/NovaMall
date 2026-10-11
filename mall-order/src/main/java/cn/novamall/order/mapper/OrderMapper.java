@@ -47,6 +47,48 @@ public interface OrderMapper extends BaseMapper<OrderEntity> {
             + "WHERE order_no = #{orderNo} AND status = 'PAID'")
     int markShippedIfPaid(@Param("orderNo") String orderNo);
 
+    @Select("SELECT COUNT(*) FROM mall_refund WHERE order_no=#{orderNo} "
+            + "AND status NOT IN ('SUCCESS','REJECTED','WITHDRAWN')")
+    int pendingRefunds(@Param("orderNo") String orderNo);
+
+    @Select("""
+            SELECT COUNT(*) FROM mall_order_item i WHERE i.order_no=#{orderNo} AND i.quantity > COALESCE((
+                SELECT SUM(ri.quantity) FROM mall_refund_item ri JOIN mall_refund r ON r.refund_no=ri.refund_no
+                WHERE ri.order_item_id=i.id AND r.status='SUCCESS'),0)
+            """)
+    int remainingItems(@Param("orderNo") String orderNo);
+
+    @Select("""
+            SELECT i.*, i.quantity-COALESCE(u.refunded_quantity,0) AS fulfilled_quantity
+            FROM mall_order_item i LEFT JOIN (
+                SELECT ri.order_item_id,SUM(ri.quantity) AS refunded_quantity FROM mall_refund_item ri
+                JOIN mall_refund r ON r.refund_no=ri.refund_no WHERE r.order_no=#{orderNo} AND r.status='SUCCESS'
+                GROUP BY ri.order_item_id
+            ) u ON u.order_item_id=i.id WHERE i.order_no=#{orderNo} ORDER BY i.id
+            """)
+    List<java.util.Map<String,Object>> fulfillmentItems(@Param("orderNo") String orderNo);
+
+    @Select("""
+            SELECT COUNT(*) AS total_count,
+              COALESCE(SUM(CASE WHEN status='SUCCESS' THEN amount ELSE 0 END),0) AS refunded_amount,
+              COALESCE(SUM(CASE WHEN status NOT IN ('SUCCESS','REJECTED','WITHDRAWN') THEN amount ELSE 0 END),0) AS pending_amount
+            FROM mall_refund WHERE order_no=#{orderNo}
+            """)
+    java.util.Map<String,Object> refundSummary(@Param("orderNo") String orderNo);
+
+    @Select("""
+            <script>
+            SELECT r.order_no,
+              COALESCE(SUM(CASE WHEN r.status='SUCCESS' THEN ri.quantity ELSE 0 END),0) AS refunded_quantity,
+              COALESCE(SUM(CASE WHEN r.status NOT IN ('SUCCESS','REJECTED','WITHDRAWN') THEN 1 ELSE 0 END),0) AS pending_count
+            FROM mall_refund r JOIN mall_refund_item ri ON ri.refund_no=r.refund_no
+            WHERE r.order_no IN
+              <foreach collection="orderNos" item="no" open="(" separator="," close=")">#{no}</foreach>
+            GROUP BY r.order_no
+            </script>
+            """)
+    List<java.util.Map<String,Object>> refundSummaries(@Param("orderNos") List<String> orderNos);
+
     @Update("UPDATE mall_order SET status = 'COMPLETED', completed_at = NOW(), updated_at = NOW() "
             + "WHERE order_no = #{orderNo} AND status = 'SHIPPED'")
     int markCompletedIfShipped(@Param("orderNo") String orderNo);

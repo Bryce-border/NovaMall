@@ -136,6 +136,7 @@ class OrderApplicationServiceTest {
         OrderEntity paid = order(7L, "ORDER-1", "PAID");
         when(orderMapper.findOwnedForUpdate(7L, "ORDER-1")).thenReturn(paid);
         when(orderMapper.markShippedIfPaid("ORDER-1")).thenReturn(1);
+        when(orderMapper.remainingItems("ORDER-1")).thenReturn(1);
         when(orderItemMapper.selectList(any())).thenReturn(List.of());
 
         OrderApiModels.OrderResponse shipped = service.ship(7L, "ORDER-1");

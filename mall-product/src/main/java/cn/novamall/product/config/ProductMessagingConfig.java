@@ -17,6 +17,20 @@ public class ProductMessagingConfig {
     public static final String SALES_DLQ = "mall.product.order-completed.dlq";
 
     @Bean
+    public Queue salesUpdatedQueue() { return new Queue("mall.product.sales-updated",true,false,false,Map.of(
+            "x-dead-letter-exchange",DEAD_LETTER_EXCHANGE,"x-dead-letter-routing-key","product.sales-updated.dlq")); }
+    @Bean
+    public Queue salesUpdatedDeadQueue() { return new Queue("mall.product.sales-updated.dlq",true); }
+    @Bean
+    public Binding salesUpdatedBinding(@Qualifier("salesUpdatedQueue") Queue queue,@Qualifier("productEventsExchange") TopicExchange exchange) {
+        return BindingBuilder.bind(queue).to(exchange).with("order.sales-updated");
+    }
+    @Bean
+    public Binding salesUpdatedDeadBinding(@Qualifier("salesUpdatedDeadQueue") Queue queue,@Qualifier("productDeadLetterExchange") TopicExchange exchange) {
+        return BindingBuilder.bind(queue).to(exchange).with("product.sales-updated.dlq");
+    }
+
+    @Bean
     public TopicExchange productEventsExchange() {
         return new TopicExchange(EVENTS_EXCHANGE, true, false);
     }

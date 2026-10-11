@@ -83,6 +83,7 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
     private boolean requiresAdmin(HttpMethod method, String path) {
         if (method == null) return false;
         if (path.equals("/api/coupons/admin") || path.startsWith("/api/coupons/admin/")) return true;
+        if (path.equals("/api/refunds/admin") || path.startsWith("/api/refunds/admin/")) return true;
         if (path.equals("/api/products") && method == HttpMethod.POST) return true;
         if (path.startsWith("/api/products/")
                 && (method == HttpMethod.PUT || method == HttpMethod.DELETE)) return true;

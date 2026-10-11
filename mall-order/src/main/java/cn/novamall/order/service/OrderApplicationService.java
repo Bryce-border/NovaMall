@@ -167,12 +167,25 @@ public class OrderApplicationService {
 
     public OrderApiModels.OrderPageResponse page(Long userId, long page, long size, String status) {
         Page<OrderEntity> result = orderMapper.findPageByUser(userId, status, page, size);
+        Map<String, Map<String,Object>> refundsByOrder = new java.util.HashMap<>();
+        if (!result.getRecords().isEmpty()) {
+            orderMapper.refundSummaries(result.getRecords().stream().map(OrderEntity::getOrderNo).toList())
+                    .forEach(r -> refundsByOrder.put(r.get("order_no").toString(), r));
+        }
         List<OrderApiModels.OrderSummaryResponse> summaries = result.getRecords().stream().map(order -> {
             List<OrderItemEntity> items = orderItemMapper.selectList(Wrappers.<OrderItemEntity>lambdaQuery()
                     .eq(OrderItemEntity::getOrderNo, order.getOrderNo()).orderByAsc(OrderItemEntity::getId));
             OrderApiModels.OrderItemResponse first = items.isEmpty() ? null : toItemResponse(items.get(0));
+            String refundStatus = null;
+            var refund = refundsByOrder.get(order.getOrderNo());
+            if (refund != null) {
+                long refundedQuantity = ((Number)refund.get("refunded_quantity")).longValue();
+                refundStatus = refundedQuantity == items.stream().mapToLong(OrderItemEntity::getQuantity).sum() ? "FULLY_REFUNDED"
+                        : ((Number)refund.get("pending_count")).longValue() > 0 ? "REFUND_PENDING"
+                        : refundedQuantity > 0 ? "PARTIALLY_REFUNDED" : null;
+            }
             return new OrderApiModels.OrderSummaryResponse(order.getOrderNo(), order.getStatus(), items.size(),
-                    first, order.getTotalAmount(), order.getCreatedAt());
+                    first, order.getTotalAmount(), order.getCreatedAt(), refundStatus);
         }).toList();
         return new OrderApiModels.OrderPageResponse(summaries, page, size, result.getTotal(),
                 page * size < result.getTotal());
@@ -226,6 +239,12 @@ public class OrderApplicationService {
         if (!PAID.equals(order.getStatus())) {
             throw new IllegalArgumentException("order cannot be shipped in status: " + order.getStatus());
         }
+        if (orderMapper.pendingRefunds(orderNo) > 0) {
+            throw new IllegalArgumentException("订单有正在处理的退款，请处理完成后再发货");
+        }
+        if (orderMapper.remainingItems(orderNo) == 0) {
+            throw new IllegalArgumentException("订单商品已全部退款，无需发货");
+        }
         if (orderMapper.markShippedIfPaid(orderNo) != 1) {
             throw new IllegalStateException("order changed during shipment: " + orderNo);
         }
@@ -243,6 +262,8 @@ public class OrderApplicationService {
         if (!SHIPPED.equals(order.getStatus())) {
             throw new IllegalArgumentException("order cannot be completed in status: " + order.getStatus());
         }
+        if (orderMapper.pendingRefunds(orderNo)>0 || orderMapper.remainingItems(orderNo)==0)
+            throw new IllegalArgumentException("订单正在退货或已全部退款，不能确认收货");
         if (orderMapper.markCompletedIfShipped(orderNo) != 1) {
             throw new IllegalStateException("order changed during completion: " + orderNo);
         }
@@ -252,7 +273,15 @@ public class OrderApplicationService {
         orderRecords.completed(order);
         List<OrderItemEntity> items = orderItemMapper.selectList(Wrappers.<OrderItemEntity>lambdaQuery()
                 .eq(OrderItemEntity::getOrderNo, orderNo));
-        orderOutboxService.appendOrderEvent("ORDER_COMPLETED", order, items);
+        // Sales count only goods retained by the buyer; original item snapshots are never changed.
+        List<OrderItemEntity> fulfilled = orderMapper.fulfillmentItems(orderNo).stream().map(row -> {
+            OrderItemEntity item = new OrderItemEntity();
+            item.setProductId(((Number)row.get("product_id")).longValue());
+            item.setQuantity(((Number)row.get("fulfilled_quantity")).intValue());
+            return item;
+        }).filter(item -> item.getQuantity() > 0).toList();
+        orderOutboxService.appendOrderEvent("ORDER_COMPLETED", order, fulfilled);
+        orderOutboxService.appendSalesSnapshot(orderNo);
         return toResponse(order, items);
     }
 

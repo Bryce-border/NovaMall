@@ -196,6 +196,11 @@ Compose 仅启动基础设施，Java 服务需要另行启动。
 | [007-mall-model-upgrade.sql](database/init/007-mall-model-upgrade.sql) | 模型扩展、默认 SKU 回填和历史库存迁移 |
 | [008-cart-checkout.sql](database/init/008-cart-checkout.sql) | 购物车版本、结算请求和清理任务 |
 | [009-order-history.sql](database/init/009-order-history.sql) | 订单状态历史；支付和物流复用 007 中的表 |
+| [010-coupons-reviews.sql](database/init/010-coupons-reviews.sql) | 优惠券、券包及商品评价 |
+| [011-refunds.sql](database/init/011-refunds.sql) | 商品退款、审核、执行记录、金额分摊及库存返还台账 |
+| [012-return-refunds.sql](database/init/012-return-refunds.sql) | 退货物流、商家验收、复核及持久化净销量 |
+
+退款功能提供未发货整单/部分退款、已发货退货退款、物流登记、商家验收与复核、原订单查询和模拟原路退款。升级方法、接口及并发测试见 [退款说明](docs/REFUNDS.md)。已有 001–010 的本地库先暂停订单/商品写入，再执行 `node scripts/migrate-refunds.mjs --apply --returns`，先备份全库再应用 011、012；随后构建并启动订单、商品、库存服务和网关。
 
 已有开发库应先备份、停止业务写入，确认基础脚本已执行，再依次执行 007、008、009。已执行 007、008 的库只需补 009。可在 IntelliJ Database 或 MySQL 客户端连接 `mall` 库执行。升级订单服务前必须创建历史表，否则新订单和状态流转会因记录写入失败而回滚。
 

@@ -21,6 +21,28 @@ public class InventoryMessagingConfig {
     public static final String PAID_DLQ = "mall.inventory.order-paid.dlq";
 
     @Bean
+    public Queue refundSucceededQueue() {
+        return new Queue("mall.inventory.refund-succeeded", true, false, false, Map.of(
+                "x-dead-letter-exchange", DEAD_LETTER_EXCHANGE,
+                "x-dead-letter-routing-key", "inventory.refund-succeeded.dlq"));
+    }
+
+    @Bean
+    public Queue refundSucceededDeadLetterQueue() { return new Queue("mall.inventory.refund-succeeded.dlq", true); }
+
+    @Bean
+    public Binding refundSucceededBinding(@Qualifier("refundSucceededQueue") Queue queue,
+                                          @Qualifier("mallEventsExchange") TopicExchange exchange) {
+        return BindingBuilder.bind(queue).to(exchange).with("refund.succeeded");
+    }
+
+    @Bean
+    public Binding refundSucceededDeadLetterBinding(@Qualifier("refundSucceededDeadLetterQueue") Queue queue,
+                                                    @Qualifier("mallEventsDeadLetterExchange") TopicExchange exchange) {
+        return BindingBuilder.bind(queue).to(exchange).with("inventory.refund-succeeded.dlq");
+    }
+
+    @Bean
     public Queue orderPaidQueue() {
         return new Queue(PAID_QUEUE, true, false, false, Map.of(
                 "x-dead-letter-exchange", DEAD_LETTER_EXCHANGE,

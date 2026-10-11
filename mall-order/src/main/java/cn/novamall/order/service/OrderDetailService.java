@@ -53,13 +53,25 @@ public class OrderDetailService {
                 .eq(OrderEntity::getUserId, userId).eq(OrderEntity::getOrderNo, orderNo));
         if (order == null) throw new IllegalArgumentException("order not found: " + orderNo);
 
+        var quantities = new java.util.HashMap<Long, Integer>();
+        orders.fulfillmentItems(orderNo).forEach(i -> quantities.put(((Number)i.get("id")).longValue(),
+                ((Number)i.get("fulfilled_quantity")).intValue()));
+        var refundAmounts = orders.refundSummary(orderNo);
+        int pendingRefunds = orders.pendingRefunds(orderNo);
+        long refundCount = ((Number)refundAmounts.get("total_count")).longValue();
+        boolean fullyRefunded = refundCount > 0 && orders.remainingItems(orderNo) == 0;
+        var refundSummary = new RefundSummary(money((BigDecimal)refundAmounts.get("refunded_amount")),
+                money((BigDecimal)refundAmounts.get("pending_amount")), pendingRefunds, refundCount, fullyRefunded);
+
         OrderAddressEntity address = addresses.selectOne(Wrappers.<OrderAddressEntity>lambdaQuery()
                 .eq(OrderAddressEntity::getOrderId, order.getId()));
         List<Item> itemDetails = items.selectList(Wrappers.<OrderItemEntity>lambdaQuery()
                 .eq(OrderItemEntity::getOrderId, order.getId()).orderByAsc(OrderItemEntity::getId))
                 .stream().map(item -> new Item(id(item.getProductId()), id(item.getSkuId()), item.getProductName(),
                         item.getCoverImageUrl(), item.getSkuName(), specs(item.getSpecJson()),
-                        money(item.getUnitPrice()), item.getQuantity(), money(item.getAmount()))).toList();
+                        money(item.getUnitPrice()), item.getQuantity(), money(item.getAmount()),
+                        item.getQuantity() - quantities.getOrDefault(item.getId(), item.getQuantity()),
+                        quantities.getOrDefault(item.getId(), item.getQuantity()))).toList();
         List<Payment> payments = records.payments(order.getId()).stream()
                 .map(p -> new Payment(p.paymentNo(), p.channel(), "MOCK".equals(p.channel()), money(p.amount()),
                         p.status(), p.paidAt(), p.createdAt())).toList();
@@ -76,12 +88,12 @@ public class OrderDetailService {
                 address == null ? null : new Address(address.getReceiverName(), address.getReceiverPhone(),
                         address.getProvince(), address.getCity(), address.getDistrict(),
                         address.getDetailAddress(), address.getPostalCode()),
-                itemDetails, payments, shipments, history, actions(order), order.getCreatedAt().plusMinutes(30),
+                itemDetails, payments, shipments, history, actions(order, pendingRefunds, fullyRefunded), order.getCreatedAt().plusMinutes(30),
                 order.getCreatedAt(), order.getUpdatedAt(), order.getPaidAt(), order.getShippedAt(),
-                order.getCompletedAt(), order.getCancelledAt());
+                order.getCompletedAt(), order.getCancelledAt(), refundSummary);
     }
 
-    private List<Action> actions(OrderEntity order) {
+    private List<Action> actions(OrderEntity order, int pendingRefunds, boolean fullyRefunded) {
         List<Action> available = new ArrayList<>();
         switch (order.getStatus()) {
             case "PENDING_PAYMENT" -> {
@@ -91,10 +103,12 @@ public class OrderDetailService {
                 }
             }
             case "PAID" -> {
-                if (mockFulfillmentEnabled) available.add(new Action("MOCK_SHIP", "模拟发货", true));
+                if (mockFulfillmentEnabled && pendingRefunds == 0 && !fullyRefunded)
+                    available.add(new Action("MOCK_SHIP", "模拟发货", true));
             }
             case "SHIPPED" -> {
-                if (mockFulfillmentEnabled) available.add(new Action("MOCK_COMPLETE", "模拟确认收货", true));
+                if (mockFulfillmentEnabled && pendingRefunds == 0 && !fullyRefunded)
+                    available.add(new Action("MOCK_COMPLETE", "模拟确认收货", true));
             }
             default -> { }
         }

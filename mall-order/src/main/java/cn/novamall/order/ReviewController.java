@@ -20,7 +20,12 @@ public class ReviewController {
     }
     @PostMapping("/{productId}") @Transactional
     public ApiResponse<?> create(@PathVariable long productId,@RequestHeader("X-User-Id") long user,@RequestHeader("X-User-Name") String name,@Valid @RequestBody ReviewRequest request){
-        Integer count=db.queryForObject("SELECT COUNT(*) FROM mall_order o JOIN mall_order_item i ON o.id=i.order_id WHERE o.user_id=? AND o.status='COMPLETED' AND i.product_id=?",Integer.class,user,productId);
+        Integer count=db.queryForObject("""
+            SELECT COUNT(*) FROM mall_order o JOIN mall_order_item i ON o.id=i.order_id
+            WHERE o.user_id=? AND o.status='COMPLETED' AND i.product_id=? AND i.quantity > COALESCE((
+              SELECT SUM(ri.quantity) FROM mall_refund_item ri JOIN mall_refund r ON r.refund_no=ri.refund_no
+              WHERE ri.order_item_id=i.id AND r.status='SUCCESS'),0)
+            """,Integer.class,user,productId);
         if(count==null||count==0)throw new IllegalArgumentException("确认收货后即可评价该商品");
         try {db.update("INSERT INTO mall_product_review(id,product_id,user_id,user_name,rating,content,created_at) VALUES(?,?,?,?,?,?,NOW())",IdGenerator.nextId(),productId,user,name,request.rating(),request.content().trim());}
         catch(DuplicateKeyException e){throw new IllegalArgumentException("你已经评价过这件商品");}

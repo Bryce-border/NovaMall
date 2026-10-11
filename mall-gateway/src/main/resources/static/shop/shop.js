@@ -3,7 +3,7 @@
   'use strict';
   const $ = selector => document.querySelector(selector);
   const app = $('#app');
-  const statusNames = { PENDING_PAYMENT: '待付款', PAID: '待发货', SHIPPED: '待收货', COMPLETED: '已完成', CANCELLED: '已取消', SUCCESS: '支付成功', DELIVERED: '已送达' };
+  const statusNames = { PENDING_PAYMENT: '待付款', PAID: '待发货', SHIPPED: '待收货', COMPLETED: '已完成', CANCELLED: '已取消', SUCCESS: '支付成功', DELIVERED: '已送达', FULLY_REFUNDED: '已全额退款', PARTIALLY_REFUNDED: '部分退款', REFUND_PENDING: '退款处理中' };
   const eventNames = { ORDER_CREATED: '订单已创建', ORDER_PAID: '模拟支付成功', ORDER_SHIPPED: '模拟商品已发货', ORDER_COMPLETED: '已确认收货', ORDER_CANCELLED: '订单已取消' };
   let token = sessionStorage.getItem('nova.token') || '';
   let username = sessionStorage.getItem('nova.username') || '';
@@ -176,6 +176,8 @@
       else if (name === 'cart' || name === 'checkout') markup = await cartPage(generation);
       else if (name === 'coupons') markup = await couponsPage();
       else if (name === 'wallet') markup = await walletPage(params);
+      else if (name === 'refunds') markup = await refundUI.list(params);
+      else if (name === 'refund') markup = await refundUI.detail(params);
       else if (name === 'payment') markup = await paymentPage(params, generation);
       else if (name === 'addresses') markup = await addressPage(generation);
       else if (name === 'orders') markup = await ordersPage(params);
@@ -252,6 +254,7 @@
     return `<div class="product-metrics"><span title="已完成订单累计件数，异步更新">已售量：<strong>${sold == null ? '暂不可用' : h(sold)}</strong></span><span title="所有规格的可用库存合计">库存：<strong>${stock ? h(stock.availableStock) : '暂不可用'}</strong></span></div>`;
   }
   async function adminPage(params, generation) {
+    if (params.get('view') === 'refunds') return params.has('no') ? refundUI.detail(params, true) : refundUI.list(params, true);
     if (params.get('view') === 'coupons') return adminCouponsPage();
     const page = Math.max(1, Number(params.get('page')) || 1);
     const keyword = params.get('q') || '';
@@ -317,7 +320,7 @@
     const page = Math.max(1, Number(params.get('page')) || 1);
     const status = params.get('status') || '';
     const data = await api(`/orders?page=${page}&size=8${status ? `&status=${encodeURIComponent(status)}` : ''}`);
-    return heading('我的订单', '查看订单进度、支付和物流信息。') + `<div class="section-top"><div class="button-row"><a class="button small" href="#orders">全部</a>${['PENDING_PAYMENT', 'PAID', 'SHIPPED', 'COMPLETED', 'CANCELLED'].map(s => `<a class="button small ${s === status ? 'primary' : ''}" href="#orders?status=${s}">${h(statusNames[s])}</a>`).join('')}</div><button class="text-button" data-action="refresh">刷新订单 ↻</button></div><div class="stack">${data.items.map(o => `<article class="panel order-card"><div class="order-top"><div><p>下单于 ${h(date(o.createdAt))}</p><span class="order-number">订单 ${h(o.orderNo)}</span></div>${badge(o.status)}</div><div class="item-row"><div class="mini-art" aria-hidden="true">${art}</div><div class="item-main"><h3>${h(o.firstItem?.productName || '订单商品')}</h3><p>${h(o.firstItem?.skuName || '')} · 共 ${h(o.itemCount)} 项商品</p></div></div><div class="order-bottom"><span>订单金额 <strong>${money(o.totalAmount)}</strong></span><a class="button small" href="#order?no=${pathId(o.orderNo)}">查看订单 →</a></div></article>`).join('') || empty('这里还没有订单', '浏览商城商品，开始你的第一笔模拟购买。', '<a class="button" href="#catalog">去逛逛</a>')}</div>${pagination('orders', page, data.hasNext, `&status=${encodeURIComponent(status)}`)}`;
+    return heading('我的订单', '查看订单进度、支付和物流信息。') + `<div class="section-top"><div class="button-row"><a class="button small" href="#orders">全部</a>${['PENDING_PAYMENT', 'PAID', 'SHIPPED', 'COMPLETED', 'CANCELLED'].map(s => `<a class="button small ${s === status ? 'primary' : ''}" href="#orders?status=${s}">${h(statusNames[s])}</a>`).join('')}</div><button class="text-button" data-action="refresh">刷新订单 ↻</button></div><div class="stack">${data.items.map(o => `<article class="panel order-card"><div class="order-top"><div><p>下单于 ${h(date(o.createdAt))}</p><span class="order-number">订单 ${h(o.orderNo)}</span></div>${badge(o.refundStatus || o.status)}</div><div class="item-row"><div class="mini-art" aria-hidden="true">${art}</div><div class="item-main"><h3>${h(o.firstItem?.productName || '订单商品')}</h3><p>${h(o.firstItem?.skuName || '')} · 共 ${h(o.itemCount)} 项商品</p></div></div><div class="order-bottom"><span>订单金额 <strong>${money(o.totalAmount)}</strong></span><a class="button small" href="#order?no=${pathId(o.orderNo)}">查看订单 →</a></div></article>`).join('') || empty('这里还没有订单', '浏览商城商品，开始你的第一笔模拟购买。', '<a class="button" href="#catalog">去逛逛</a>')}</div>${pagination('orders', page, data.hasNext, `&status=${encodeURIComponent(status)}`)}`;
   }
   async function orderPage(params, generation) {
     const o = await api(`/orders/${pathId(params.get('no'))}/detail`);
@@ -353,7 +356,7 @@
     }
   }
   function merchantTabs(active) {
-    return `<nav class="merchant-tabs" aria-label="商家管理"><a href="#admin" ${active==='products'?'aria-current="page"':''}>商品与库存</a><a href="#admin?view=coupons" ${active==='coupons'?'aria-current="page"':''}>优惠券发放</a><a href="#catalog">返回商城</a></nav>`;
+    return `<nav class="merchant-tabs" aria-label="商家管理"><a href="#admin" ${active==='products'?'aria-current="page"':''}>商品与库存</a><a href="#admin?view=coupons" ${active==='coupons'?'aria-current="page"':''}>优惠券发放</a><a href="#admin?view=refunds" ${active==='refunds'?'aria-current="page"':''}>退款管理</a><a href="#catalog">返回商城</a></nav>`;
   }
   function closeWorkspace() {
     const section = $('#workspace-content [data-template]');
@@ -378,9 +381,18 @@
     $('#digital-nav').href=digital?catalogLink(String(digital.id)):'#catalog?q=手机';
   }
   function afterRender(name,params) {
+    refundUI.afterRender(name, params);
+    if (name === 'order' && currentOrder) {
+      const aside = app.querySelector('aside.stack');
+      if (aside) aside.insertAdjacentHTML('afterbegin', refundUI.orderPanel(currentOrder));
+      if (currentOrder.refund?.fullyRefunded) {
+        const state = app.querySelector('.detail-title .tag');
+        if (state) state.textContent = '已全额退款';
+      }
+    }
     $('#nav-categories').open=false;
     document.querySelectorAll('[data-nav]').forEach(a=>{
-      const active=a.dataset.nav===name || a.dataset.nav==='orders'&&['order','payment'].includes(name) || a.dataset.nav==='cart'&&name==='checkout';
+      const active=a.dataset.nav===name || a.dataset.nav==='orders'&&['order','payment'].includes(name) || a.dataset.nav==='cart'&&name==='checkout' || a.dataset.nav==='refunds'&&name==='refund';
       if(active && !(name==='catalog'&&(params.get('categoryId')||params.get('q')))) a.setAttribute('aria-current','page');
       else a.removeAttribute('aria-current');
     });
@@ -514,6 +526,7 @@
     showWorkspace(`<h2 id="workspace-title">发布优惠券活动</h2><form id="admin-coupon-form"><div class="form-grid"><label class="wide">活动名称<input name="name" required maxlength="100" placeholder="例如：19.9 元五张满减券包"></label><label>活动类型<select name="kind"><option value="FREE">免费限时抢券</option><option value="PACK">付费券包（模拟支付）</option></select></label><label>发放数量（份）<input name="totalQuantity" type="number" min="1" max="100000" value="100" required></label><label>满多少元<input name="thresholdAmount" type="number" min="0.01" step="0.01" value="20" required></label><label>减多少元<input name="discountAmount" type="number" min="0.01" step="0.01" value="5" required></label><label>每份券数量<input name="packSize" type="number" min="1" max="20" value="1" required></label><label>每份价格（元）<input name="packPrice" type="number" min="0" step="0.01" value="0" required></label><label>开放时间<input name="opensAt" type="datetime-local" value="${localInputTime(now)}" required></label><label>发放截止时间<input name="closesAt" type="datetime-local" value="${localInputTime(now+7*86400000)}" required></label><label class="wide">优惠券到期时间<input name="expiresAt" type="datetime-local" value="${localInputTime(now+30*86400000)}" required></label></div><p class="hint">时间为北京时间。全场通用，每单一张、不可叠加；每账号每活动限一份。免费券须设每份 1 张、价格 0 元。发布后可暂停发放；修改规则请新建活动。</p><button class="button primary full" type="submit">发布活动</button></form>`);
   }
   async function commerceSubmit(form, values) {
+    if (await refundUI.submit(form, values)) return true;
     if(form.id==='review-form') {
       await api(`/reviews/${pathId(currentProduct.id)}`,'POST',{rating:Number(values.rating),content:values.content.trim()});
       await render(); notify('评价已发布。'); return true;
@@ -526,6 +539,7 @@
     return false;
   }
   async function commerceAction(action,button) {
+    if (await refundUI.action(action, button)) return true;
     if(action==='product-quantity') {
       if(!token){showAuth();return true;}
       if(flow())throw new Error('请先确认上一次结算结果。');
@@ -676,7 +690,7 @@
   });
   document.addEventListener('submit', event => {
     const form = event.target;
-    if (!['global-search-form', 'search-form', 'auth-form', 'address-form', 'admin-search-form', 'admin-product-form', 'admin-category-form', 'admin-stock-form', 'review-form', 'admin-coupon-form'].includes(form.id)) return;
+    if (!['global-search-form', 'search-form', 'auth-form', 'address-form', 'admin-search-form', 'admin-product-form', 'admin-category-form', 'admin-stock-form', 'review-form', 'admin-coupon-form', 'refund-search-form', 'refund-quote-form', 'refund-apply-form', 'refund-review-form', 'return-logistics-form', 'return-inspect-form', 'return-recheck-form'].includes(form.id)) return;
     event.preventDefault();
     const values = Object.fromEntries(new FormData(form));
     work(async () => {
@@ -746,6 +760,8 @@
     if (event.target instanceof HTMLImageElement) event.target.parentElement.innerHTML = illustration(event.target.alt);
   }, true);
   window.addEventListener('hashchange', () => { closeCart(); window.scrollTo(0,0); render(); });
+  const refundUI = window.createNovaRefundUI({ api, h, money, date, pathId, heading, empty, merchantTabs,
+    showWorkspace, closeWorkspace, confirmAction, notify, go, render, isAdmin, getUsername: () => username });
   account(); refreshNavigation().catch(error=>notify(error.message,true)); render();
 })();
 

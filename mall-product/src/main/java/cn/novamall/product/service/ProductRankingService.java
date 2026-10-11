@@ -1,63 +1,29 @@
 package cn.novamall.product.service;
 
-import cn.novamall.product.ProductOrderEventListener.OrderItem;
 import cn.novamall.product.ProductApiModels;
-import cn.novamall.product.entity.ProductEntity;
-import cn.novamall.product.mapper.ProductMapper;
-import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
-import java.time.Duration;
-import java.util.List;
+import java.util.*;
 
 @Service
 public class ProductRankingService {
-    private static final String SALES_KEY = "product:sales";
-    private static final String EVENT_KEY_PREFIX = "product:sales:event:";
-    private final StringRedisTemplate redisTemplate;
-    private final ProductMapper productMapper;
-
-    public ProductRankingService(StringRedisTemplate redisTemplate, ProductMapper productMapper) {
-        this.redisTemplate = redisTemplate;
-        this.productMapper = productMapper;
-    }
-
-    public void recordCompletedOrder(String eventId, List<OrderItem> items) {
-        if (items == null || items.stream().anyMatch(item -> item.productId() == null
-                || item.quantity() == null || item.quantity() <= 0)) {
-            throw new IllegalArgumentException("invalid order item in completion event");
-        }
-        Boolean firstDelivery = redisTemplate.opsForValue().setIfAbsent(
-                EVENT_KEY_PREFIX + eventId, "1", Duration.ofDays(30));
-        if (!Boolean.TRUE.equals(firstDelivery)) return;
-        for (OrderItem item : items) {
-            redisTemplate.opsForZSet().incrementScore(SALES_KEY,
-                    String.valueOf(item.productId()), item.quantity());
-        }
-    }
+    private final JdbcTemplate db;
+    public ProductRankingService(JdbcTemplate db){this.db=db;}
 
     public List<ProductApiModels.SalesProductResponse> topSales(long limit) {
-        var entries = redisTemplate.opsForZSet().reverseRangeWithScores(SALES_KEY, 0, limit - 1);
-        if (entries == null || entries.isEmpty()) return List.of();
-        List<Long> ids = entries.stream().map(e -> Long.valueOf(String.valueOf(e.getValue()))).toList();
-        var products = productMapper.selectBatchIds(ids).stream()
-                .filter(p -> Integer.valueOf(1).equals(p.getStatus()))
-                .collect(java.util.stream.Collectors.toMap(ProductEntity::getId, p -> p));
-        return ids.stream().filter(products::containsKey).map(id -> {
-            ProductEntity p = products.get(id);
-            Double score = entries.stream().filter(e -> String.valueOf(id).equals(String.valueOf(e.getValue())))
-                    .map(org.springframework.data.redis.core.ZSetOperations.TypedTuple::getScore)
-                    .findFirst().orElse(0D);
-            return new ProductApiModels.SalesProductResponse(id, p.getName(), p.getPrice(), score);
-        }).toList();
+        return db.query("""
+                SELECT p.id,p.name,p.price,s.quantity FROM mall_product_sales_total s JOIN mall_product p ON p.id=s.product_id
+                WHERE p.deleted=0 AND p.status=1 AND s.quantity>0 ORDER BY s.quantity DESC,p.id LIMIT ?
+                """,(rs,n)->new ProductApiModels.SalesProductResponse(rs.getLong("id"),rs.getString("name"),rs.getBigDecimal("price"),rs.getDouble("quantity")),Math.max(1,Math.min(limit,100)));
     }
 
     public List<ProductApiModels.SalesCountResponse> salesCounts(List<Long> productIds) {
-        // Query the requested products directly; absence from a top-N ranking is not zero sales.
-        // Redis errors propagate so clients can display "unavailable" instead of an invented zero.
-        return productIds.stream().distinct().map(id -> {
-            Double score = redisTemplate.opsForZSet().score(SALES_KEY, String.valueOf(id));
-            return new ProductApiModels.SalesCountResponse(
-                    id.toString(), score == null ? 0L : score.longValue());
-        }).toList();
+        if(productIds.isEmpty())return List.of();
+        var ids=productIds.stream().distinct().toList();
+        var placeholders=String.join(",",Collections.nCopies(ids.size(),"?"));
+        Map<Long,Long> counts=new HashMap<>();
+        db.queryForList("SELECT product_id,quantity FROM mall_product_sales_total WHERE product_id IN ("+placeholders+")",ids.toArray())
+                .forEach(r->counts.put(((Number)r.get("product_id")).longValue(),((Number)r.get("quantity")).longValue()));
+        return ids.stream().map(id->new ProductApiModels.SalesCountResponse(id.toString(),counts.getOrDefault(id,0L))).toList();
     }
 }
